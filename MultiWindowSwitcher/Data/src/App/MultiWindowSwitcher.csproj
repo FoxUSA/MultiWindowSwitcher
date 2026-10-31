@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <!--  только ради значка в трее (NotifyIcon); всё остальное — WPF  -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>MultiWindowSwitcher</RootNamespace>
+    <AssemblyName>MultiWindowSwitcher.App</AssemblyName>
+    <Product>MultiWindowSwitcher</Product>
+    <!--  номер версии задаёт build.ps1 (-p:Version), источник правды — Data\manifest.json  -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!--  DPI задаёт app.manifest: окна WPF, а WinForms тут только ради значка в трее  -->
+    <NoWarn>$(NoWarn);WFO0003</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--  имена из WinForms не должны спорить с WPF (Application, MessageBox, Button…)  -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--  иконки папок: ресурсом в сборке (эталон для восстановления) и файлами в Data  -->
+    <Resource Include="Assets\app.ico" />
+    <Resource Include="Assets\data.ico" />
+    <Resource Include="Assets\user_data.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WPF-UI" Version="4.3.0" />
+  </ItemGroup>
+
+</Project>

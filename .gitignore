@@ -1,0 +1,14 @@
+bin/
+obj/
+.vs/
+*.user
+desktop.ini
+
+# build output: only the sources, build.ps1 and manifest.json are tracked
+/MultiWindowSwitcher/*
+!/MultiWindowSwitcher/Data/
+/MultiWindowSwitcher/Data/*
+!/MultiWindowSwitcher/Data/src/
+!/MultiWindowSwitcher/Data/build.ps1
+!/MultiWindowSwitcher/Data/manifest.json
+/publish/

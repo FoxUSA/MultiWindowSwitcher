@@ -1,0 +1,283 @@
+﻿<UserControl
+  x:Class="MultiWindowSwitcher.Views.Controls.WindowTile"
+  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  xmlns:core="clr-namespace:MultiWindowSwitcher.Core"
+  Cursor="Hand"
+  Focusable="False">
+
+  <!--
+    Превью рисует сама Windows (DWM) поверх окна программы в прямоугольнике PreviewHost.
+    Поэтому поверх превью ничего не кладём: имя, метки и кнопки — в шапке, полосе имени и нижней полосе.
+  -->
+  <Border
+    x:Name="Frame"
+    Background="{StaticResource TileBrush}"
+    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+    BorderThickness="1"
+    CornerRadius="8">
+    <Grid>
+      <Grid.RowDefinitions>
+        <RowDefinition Height="30" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="*" />
+        <RowDefinition Height="30" />
+      </Grid.RowDefinitions>
+
+      <Border
+        Grid.Row="0"
+        Background="{StaticResource TileHeaderBrush}"
+        BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+        BorderThickness="0,0,0,1"
+        CornerRadius="7,7,0,0">
+        <Grid Margin="9,0,5,0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+
+          <Image
+            x:Name="AppIcon"
+            Grid.Column="0"
+            Width="16"
+            Height="16"
+            Margin="0,0,8,0"
+            RenderOptions.BitmapScalingMode="HighQuality" />
+          <TextBlock
+            x:Name="TitleText"
+            Grid.Column="1"
+            MinWidth="48"
+            VerticalAlignment="Center"
+            FontSize="12"
+            Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+            TextTrimming="CharacterEllipsis" />
+          <!--  метки (событие, монитор, открыто/свёрнуто/в трее) — у правого края; при наведении
+                уступают место кнопкам  -->
+          <StackPanel
+            x:Name="Chips"
+            Grid.Column="3"
+            Orientation="Horizontal">
+            <Border
+              x:Name="AttentionChip"
+              Margin="6,0,0,0"
+              Padding="7,1"
+              VerticalAlignment="Center"
+              Background="{StaticResource AttentionBrush}"
+              CornerRadius="9"
+              Visibility="Collapsed">
+              <TextBlock
+                FontSize="10.5"
+                FontWeight="SemiBold"
+                Foreground="#1A1000"
+                Text="{core:T Event}" />
+            </Border>
+            <Border
+              x:Name="MonitorBadge"
+              Margin="6,0,0,0"
+              Padding="4,0"
+              VerticalAlignment="Center"
+              BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+              BorderThickness="1"
+              CornerRadius="3">
+              <TextBlock
+                x:Name="MonitorText"
+                FontSize="10"
+                Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+            </Border>
+            <Border
+              x:Name="StateChip"
+              Margin="6,0,0,0"
+              Padding="7,1"
+              VerticalAlignment="Center"
+              CornerRadius="9">
+              <TextBlock x:Name="StateText" FontSize="10.5" />
+            </Border>
+          </StackPanel>
+
+          <!--  все кнопки рядом, у правого края, при наведении: шире, крупнее, скрыть, закрыть.
+                Шрифт значков — у TextBlock, не у кнопки: иначе им же пишутся подсказки  -->
+          <StackPanel
+            x:Name="CornerActions"
+            Grid.Column="6"
+            Visibility="Collapsed"
+            Margin="4,0,0,0"
+            Orientation="Horizontal">
+            <!--  двойная ширина: окно занимает две ячейки сетки — стрелка «шире» между чертами  -->
+            <Button
+              x:Name="WideButton"
+              Click="OnWide"
+              Style="{StaticResource IconButton}">
+              <Path
+                Width="16"
+                Height="12"
+                Data="M0.75,1 L0.75,11 M15.25,1 L15.25,11 M3,6 L13,6 M5.5,3.5 L3,6 L5.5,8.5 M10.5,3.5 L13,6 L10.5,8.5"
+                Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                StrokeEndLineCap="Round"
+                StrokeLineJoin="Round"
+                StrokeStartLineCap="Round"
+                StrokeThickness="1.3" />
+            </Button>
+            <!--  посмотреть крупнее — лупа с плюсом  -->
+            <Button
+              Click="OnPeek"
+              Style="{StaticResource IconButton}"
+              ToolTip="{core:T PeekTip}">
+              <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Text="&#xE8A3;" />
+            </Button>
+            <Button
+              x:Name="HideButton"
+              Click="OnHide"
+              Style="{StaticResource IconButton}">
+              <TextBlock x:Name="HideGlyph" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" />
+            </Button>
+            <Button
+              Click="OnClose"
+              Style="{StaticResource DangerIconButton}"
+              ToolTip="{core:T CloseTip}">
+              <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Text="&#xE711;" />
+            </Button>
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <!--  своё имя окна — крупно, чтобы читалось издалека  -->
+      <Border
+        x:Name="Banner"
+        Grid.Row="1"
+        Padding="12,4,12,5"
+        Background="{StaticResource BannerBrush}"
+        Visibility="Collapsed">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <TextBlock
+            x:Name="NameText"
+            FontFamily="Segoe UI Variable Display, Segoe UI"
+            VerticalAlignment="Center"
+            FontWeight="Bold"
+            TextTrimming="CharacterEllipsis" />
+          <!--  убрать имя — при наведении (изменить — карандаш внизу)  -->
+          <StackPanel
+            x:Name="BannerActions"
+            Grid.Column="1"
+            Margin="6,0,-6,0"
+            VerticalAlignment="Center"
+            Orientation="Horizontal"
+            Visibility="Collapsed">
+            <!--  изменить и убрать название — при наведении; ластик, а не крестик: крестик закрывает окно  -->
+            <Button
+              Width="28"
+              Height="26"
+              Click="OnRename"
+              Style="{StaticResource IconButton}"
+              ToolTip="{core:T BannerEditTip}">
+              <TextBlock FontSize="15" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Text="&#xE70F;" />
+            </Button>
+            <Button
+              Width="28"
+              Height="26"
+              Click="OnBannerRemove"
+              Style="{StaticResource IconButton}"
+              ToolTip="{core:T BannerRemoveTip}">
+              <TextBlock FontSize="15" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Text="&#xE75C;" />
+            </Button>
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <Border
+        x:Name="PreviewHost"
+        Grid.Row="2"
+        Background="{StaticResource PreviewBrush}">
+        <Grid>
+          <!--  окно в трее: последний снимок, пока оно было на экране  -->
+          <Image
+            x:Name="Snapshot"
+            Margin="4"
+            RenderOptions.BitmapScalingMode="HighQuality"
+            Stretch="Uniform"
+            Visibility="Collapsed" />
+          <Border
+            x:Name="SnapshotAge"
+            Margin="0,0,8,8"
+            Padding="8,2"
+            HorizontalAlignment="Right"
+            VerticalAlignment="Bottom"
+            Background="#CC1C1C1C"
+            CornerRadius="9"
+            Visibility="Collapsed">
+            <TextBlock
+              x:Name="SnapshotAgeText"
+              FontSize="11"
+              Foreground="#E0E0E0" />
+          </Border>
+          <!--  пока нет превью (окно администратора, ошибка DWM) — крупная иконка программы  -->
+          <Image
+            x:Name="FallbackIcon"
+            Width="64"
+            Height="64"
+            Opacity="0.55"
+            RenderOptions.BitmapScalingMode="HighQuality" />
+        </Grid>
+      </Border>
+
+      <!--  поверх превью класть нельзя (его рисует DWM), поэтому своя полоса снизу:
+            слева — на следующий монитор, справа карандаш и избранное — при наведении; включённое избранное видно всегда  -->
+      <Border
+        Grid.Row="3"
+        Background="{StaticResource TileHeaderBrush}"
+        BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+        BorderThickness="0,1,0,0"
+        CornerRadius="0,0,7,7">
+        <Grid>
+          <Button
+            x:Name="MonitorButton"
+            Margin="5,0,0,0"
+            HorizontalAlignment="Left"
+            VerticalAlignment="Center"
+            Visibility="Hidden"
+            Click="OnNextMonitor"
+            Height="26"
+            Width="30"
+            Style="{StaticResource IconButton}"
+            ToolTip="{core:T NextMonitorTip}">
+            <TextBlock FontSize="15" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Text="&#xE7F4;" />
+          </Button>
+          <StackPanel
+            Margin="0,0,5,0"
+            HorizontalAlignment="Right"
+            VerticalAlignment="Center"
+            Orientation="Horizontal">
+            <Button
+              x:Name="RenameButton"
+              Visibility="Hidden"
+              Click="OnRename"
+              Content="✎"
+              FontSize="15"
+              Height="26"
+              Width="30"
+              Style="{StaticResource IconButton}"
+              ToolTip="{core:T RenameTip}" />
+            <Button
+              x:Name="PinButton"
+              Visibility="Hidden"
+              Click="OnPin"
+              Content="★"
+              FontSize="18"
+              Height="26"
+              Width="30"
+              Style="{StaticResource IconButton}"
+              ToolTip="{core:T PinTip}" />
+          </StackPanel>
+        </Grid>
+      </Border>
+    </Grid>
+  </Border>
+</UserControl>

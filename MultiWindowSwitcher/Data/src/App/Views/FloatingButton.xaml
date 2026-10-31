@@ -1,0 +1,91 @@
+<Window
+  x:Class="MultiWindowSwitcher.Views.FloatingButton"
+  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  Title="MultiWindowSwitcher"
+  Width="72"
+  Height="72"
+  AllowsTransparency="True"
+  Background="Transparent"
+  ResizeMode="NoResize"
+  ShowActivated="False"
+  ShowInTaskbar="False"
+  Topmost="True"
+  WindowStartupLocation="Manual"
+  WindowStyle="None">
+
+  <!--  кнопка 56×56 в середине окна 72×72: по краям место для счётчика, точки и пульса  -->
+  <Grid x:Name="Root" Cursor="Hand">
+    <Border
+      x:Name="AttentionRing"
+      Width="66"
+      Height="66"
+      BorderBrush="#F59E0B"
+      BorderThickness="2"
+      CornerRadius="20"
+      Opacity="0" />
+
+    <Border
+      x:Name="Face"
+      Width="56"
+      Height="56"
+      CornerRadius="16">
+      <Border.Background>
+        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+          <GradientStop Offset="0" Color="#4CA6FF" />
+          <GradientStop Offset="1" Color="#7C5CFF" />
+        </LinearGradientBrush>
+      </Border.Background>
+      <Border.Effect>
+        <DropShadowEffect
+          BlurRadius="16"
+          Opacity="0.5"
+          ShadowDepth="4"
+          Color="Black" />
+      </Border.Effect>
+      <!--  та же мозаика окон, что на иконке программы  -->
+      <Canvas Width="56" Height="56">
+        <Rectangle Canvas.Left="10" Canvas.Top="10" Width="19" Height="19" Fill="White" RadiusX="3.5" RadiusY="3.5" />
+        <Rectangle Canvas.Left="33" Canvas.Top="10" Width="12.5" Height="9" Fill="#A6FFFFFF" RadiusX="2.5" RadiusY="2.5" />
+        <Rectangle Canvas.Left="33" Canvas.Top="21.5" Width="12.5" Height="7.5" Fill="#A6FFFFFF" RadiusX="2.5" RadiusY="2.5" />
+        <Rectangle Canvas.Left="10" Canvas.Top="33" Width="12.5" Height="12.5" Fill="#A6FFFFFF" RadiusX="2.5" RadiusY="2.5" />
+        <Rectangle Canvas.Left="25" Canvas.Top="33" Width="20.5" Height="12.5" Fill="#A6FFFFFF" RadiusX="2.5" RadiusY="2.5" />
+        <Ellipse Canvas.Left="22" Canvas.Top="9" Width="9" Height="9" Fill="#FF4D6A" Stroke="White" StrokeThickness="1.5" />
+      </Canvas>
+    </Border>
+
+    <!--  сколько окон  -->
+    <Border
+      x:Name="Badge"
+      MinWidth="20"
+      Height="20"
+      Margin="2,2,0,0"
+      Padding="5,0"
+      HorizontalAlignment="Left"
+      VerticalAlignment="Top"
+      Background="#FF4D6A"
+      BorderBrush="#0B1220"
+      BorderThickness="2"
+      CornerRadius="10">
+      <TextBlock
+        x:Name="BadgeText"
+        HorizontalAlignment="Center"
+        VerticalAlignment="Center"
+        FontSize="10.5"
+        FontWeight="Bold"
+        Foreground="White" />
+    </Border>
+
+    <!--  зелёная — переключатель открыт, серая — спрятан  -->
+    <Ellipse
+      x:Name="StateDot"
+      Width="15"
+      Height="15"
+      Margin="0,0,5,5"
+      HorizontalAlignment="Right"
+      VerticalAlignment="Bottom"
+      Fill="#6B7280"
+      Stroke="#0B1220"
+      StrokeThickness="2" />
+  </Grid>
+</Window>
