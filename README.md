@@ -16,6 +16,7 @@ Hover the edge icon — see it, click — switch.
 ![Windows 10 / 11](https://img.shields.io/badge/Windows-10%20%2F%2011-0078D6?logo=windows)
 ![English · Русский](https://img.shields.io/badge/UI-English%20%C2%B7%20%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9-444)
 ![Free](https://img.shields.io/badge/price-free-2ea44f)
+[![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 
 **English** · [Русский](README.ru.md)
 
@@ -46,7 +47,23 @@ See what's going on in every window at once — minimized ones too. Pick one to 
 
 Not sure yet? Try the [live demo](https://byfox.dev/multiwindowswitcher/demo/?lang=en) right in the browser.
 
-Windows 10 / 11 (x64), requires [.NET 9 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/9.0). Freeware, no telemetry. This repository hosts the page and download links only.
+Windows 10 / 11 (x64), requires [.NET 9 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/9.0). Free, open source, no telemetry.
+
+## Build from source
+
+Requires the [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0).
+
+```powershell
+git clone https://github.com/FoxUSA/MultiWindowSwitcher.git
+cd MultiWindowSwitcher
+powershell -ExecutionPolicy Bypass -File .\Data\build.ps1
+```
+
+The launcher `MultiWindowSwitcher.exe` appears in the repository root, the program in `Data`, your settings in `UserData`. Sources: `Data/src/App` (the program, WPF + [WPF UI](https://github.com/lepoco/wpfui)), `Data/src/Launcher` (the launcher).
+
+## License
+
+[GPL-3.0](LICENSE) — use, change and share freely, with a link to the author ([NOTICE](NOTICE)); programs built on this code must stay open source too.
 
 ---
 

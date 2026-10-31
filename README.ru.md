@@ -16,6 +16,7 @@
 ![Windows 10 / 11](https://img.shields.io/badge/Windows-10%20%2F%2011-0078D6?logo=windows)
 ![Русский · English](https://img.shields.io/badge/%D0%B8%D0%BD%D1%82%D0%B5%D1%80%D1%84%D0%B5%D0%B9%D1%81-%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9%20%C2%B7%20English-444)
 ![Бесплатно](https://img.shields.io/badge/%D1%86%D0%B5%D0%BD%D0%B0-%D0%B1%D0%B5%D1%81%D0%BF%D0%BB%D0%B0%D1%82%D0%BD%D0%BE-2ea44f)
+[![Лицензия: GPL-3.0](https://img.shields.io/badge/лицензия-GPL--3.0-blue)](LICENSE)
 
 [English](README.md) · **Русский**
 
@@ -46,4 +47,20 @@
 
 Сначала посмотреть? [Демонстрация](https://byfox.dev/multiwindowswitcher/demo/?lang=ru) работает прямо в браузере.
 
-Windows 10 / 11 (x64), нужен [.NET 9 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/9.0). Бесплатно, без телеметрии. В этом репозитории — только страница и ссылки на загрузку.
+Windows 10 / 11 (x64), нужен [.NET 9 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/9.0). Бесплатно, открытый код, без телеметрии.
+
+## Сборка из исходников
+
+Нужен [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0).
+
+```powershell
+git clone https://github.com/FoxUSA/MultiWindowSwitcher.git
+cd MultiWindowSwitcher
+powershell -ExecutionPolicy Bypass -File .\Data\build.ps1
+```
+
+Лаунчер `MultiWindowSwitcher.exe` появится в корне репозитория, программа — в `Data`, настройки — в `UserData`. Исходники: `Data/src/App` (программа, WPF + [WPF UI](https://github.com/lepoco/wpfui)), `Data/src/Launcher` (лаунчер).
+
+## Лицензия
+
+[GPL-3.0](LICENSE) — можно пользоваться, менять и распространять со ссылкой на автора ([NOTICE](NOTICE)); программы на основе этого кода тоже должны оставаться открытыми.
