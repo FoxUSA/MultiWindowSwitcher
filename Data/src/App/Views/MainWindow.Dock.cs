@@ -97,8 +97,26 @@ public partial class MainWindow
         }
     }
 
-    private MonitorInfo DockMonitor() =>
-        Monitors.All().FirstOrDefault(m => m.Device == Settings.Current.DockDevice) ?? Monitors.Primary();
+    private MonitorInfo DockMonitor()
+    {
+        var s = Settings.Current;
+        var monitor = Monitors.Find(s.DockMonitor, s.DockDevice);
+
+        // старые настройки: монитор был только по имени — запоминаем его Id, пока имена не перетасовались
+        if (s.DockMonitor.Length == 0 && monitor.Id.Length > 0)
+        {
+            SetDockMonitor(monitor);
+        }
+
+        return monitor;
+    }
+
+    private static void SetDockMonitor(MonitorInfo monitor)
+    {
+        Settings.Current.DockMonitor = monitor.Id;
+        Settings.Current.DockDevice = monitor.Device;
+        Settings.Touch();
+    }
 
     private static int DockPixels(MonitorInfo monitor) =>
         Math.Min((int)(Math.Max(Settings.Current.DockHeight, DockMinHeight) * monitor.Scale), monitor.Bounds.Height / 2);
@@ -162,7 +180,7 @@ public partial class MainWindow
 
         if (!Docked)
         {
-            s.DockDevice = Monitors.FromWindow(_hwnd).Device;
+            SetDockMonitor(Monitors.FromWindow(_hwnd));
         }
 
         s.Dock = dock;
@@ -283,7 +301,11 @@ public partial class MainWindow
         DockRail.Margin = new Thickness(6, TilesHost.Margin.Top, 4, 0);
     }
 
-    private void OnRailHide(object sender, RoutedEventArgs e) => HideSwitcher();
+    private void OnRailHide(object sender, RoutedEventArgs e)
+    {
+        AppLog.Info("Кнопка на ленте: спрятать.");
+        HideSwitcher();
+    }
 
     /// <summary>Сейчас окно обрезано до этой ширины в пикселях; 0 — не обрезано.</summary>
     private int _stripRegion;
@@ -303,6 +325,7 @@ public partial class MainWindow
             var used = Tiles.TranslatePoint(new Point(Tiles.UsedWidth, 0), this).X;
             var needed = (int)Math.Ceiling((used + 6) * VisualTreeHelper.GetDpi(this).DpiScaleX);
             width = needed < r.Width ? needed : 0;
+            _stripFit.SetUsed(Math.Min(needed, r.Width), Tracker.Windows);
         }
 
         if (width == _stripRegion)
@@ -532,8 +555,7 @@ public partial class MainWindow
     {
         var all = Monitors.All();
         var next = all[DockMonitor().Number % all.Count];
-        Settings.Current.DockDevice = next.Device;
-        Settings.Touch();
+        SetDockMonitor(next);
         PlaceDock();
         Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => UpdateThumbnails(true)));
     }

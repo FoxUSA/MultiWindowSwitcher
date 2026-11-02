@@ -312,10 +312,12 @@ public partial class MainWindow : FluentWindow, ITileHost
     {
         if (IsShown && !_hiding && !IsCovered())
         {
+            AppLog.Info("Значок в трее: спрятать.");
             HideSwitcher();
             return;
         }
 
+        AppLog.Info("Значок в трее: показать.");
         ShowSwitcher(App.Current.Fab.Side, ShowReason.Explicit);
     }
 
@@ -1471,7 +1473,7 @@ public partial class MainWindow : FluentWindow, ITileHost
         if (name.Length > 0)
         {
             // имя сразу за этим окном: совпадает его заголовок с правилом или нет
-            item.NameRule = new NameRule { App = item.App, AppTitle = item.AppTitle, Fragment = fragment, Name = name, Hwnd = item.Hwnd.ToInt64() };
+            item.NameRule = new NameRule { App = item.App, AppTitle = item.AppTitle, Fragment = fragment, Name = name, Hwnd = item.Hwnd.ToInt64(), ByProject = WindowTracker.ProjectOf(item) is not null };
             rules.Add(item.NameRule);
         }
 

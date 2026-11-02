@@ -129,8 +129,8 @@ public partial class FloatingButton : Window
 
     private MonitorInfo CurrentMonitor()
     {
-        var all = Monitors.All();
-        return all.FirstOrDefault(m => m.Device == Settings.Current.Fab.Device) ?? all.First();
+        var fab = Settings.Current.Fab;
+        return Monitors.Find(fab.Monitor, fab.Device);
     }
 
     /// <summary>Поставить кнопку по настройкам: у края или свободно, на сохранённой высоте.</summary>
@@ -440,6 +440,7 @@ public partial class FloatingButton : Window
         var snap = (int)(SnapDistance * monitor.Scale);
         var fab = Settings.Current.Fab;
 
+        fab.Monitor = monitor.Id;
         fab.Device = monitor.Device;
         fab.Y = Math.Clamp((r.Top - work.Top) / (double)Math.Max(1, work.Height - r.Height), 0, 1);
 

@@ -25,6 +25,9 @@ public sealed class NameRule
 
     /// <summary>Окно, которому имя дано. Пока оно открыто, имя держится за ним, что бы ни было в заголовке, — и после перезапуска переключателя.</summary>
     public long Hwnd { get; set; }
+
+    /// <summary>Окно редактора кода: Fragment — его проект, и имя держится за проектом, а не за окном.</summary>
+    public bool ByProject { get; set; }
 }
 
 /// <summary>Закреплённое первым окно — тоже правилом, чтобы пережить перезапуск.</summary>
@@ -102,6 +105,9 @@ public sealed class Placement
 /// <summary>Где стоит плавающая кнопка: у какого края какого монитора и на какой высоте.</summary>
 public sealed class FabPlacement
 {
+    /// <summary>Id монитора (см. MonitorInfo.Id); имя устройства — для настроек, где Id ещё нет.</summary>
+    public string Monitor { get; set; } = string.Empty;
+
     public string Device { get; set; } = string.Empty;
 
     /// <summary>L, R — прилипла к краю; пусто — стоит свободно.</summary>
@@ -188,7 +194,9 @@ public sealed class AppSettings
     /// </summary>
     public bool DockReserve { get; set; }
 
-    /// <summary>Монитор ленты (имя устройства).</summary>
+    /// <summary>Монитор ленты: Id (см. MonitorInfo.Id); имя устройства — для настроек, где Id ещё нет.</summary>
+    public string DockMonitor { get; set; } = string.Empty;
+
     public string DockDevice { get; set; } = string.Empty;
 
     /// <summary>Высота ленты в единицах WPF.</summary>

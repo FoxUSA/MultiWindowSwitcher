@@ -7,6 +7,7 @@ namespace MultiWindowSwitcher.Services;
 /// <summary>
 /// Окна, зашедшие на полосу ленты, подгоняем сами, и развёрнутые тоже (если место не зарезервировано, Windows их не
 /// подстроит): край окна встаёт по краю ленты, другая сторона остаётся на месте. Не уменьшается — окно сдвигается целиком. Ленту убрали — окна получают прежний размер; если человек успел подвинуть окно сам, не трогаем.
+/// Мешает окнам только часть полосы до последней плитки: правее лента прозрачна для кликов, и окно там никому не мешает.
 /// </summary>
 public sealed class StripFit
 {
@@ -23,6 +24,9 @@ public sealed class StripFit
 
     private RECT? _band;
     private bool _top;
+
+    /// <summary>Сколько пикселей ленты от левого края заняты плитками; пока не известно — окна не трогаем.</summary>
+    private int? _used;
 
     /// <summary>Лента встала сюда. То же место — ничего не делаем; другое — вернуть окна и подогнать заново.</summary>
     public void Apply(RECT band, bool top, IEnumerable<WindowItem> windows)
@@ -45,6 +49,18 @@ public sealed class StripFit
         _band = null;
     }
 
+    /// <summary>Плиток стало больше или меньше: занятая часть ленты теперь другая.</summary>
+    public void SetUsed(int width, IEnumerable<WindowItem> windows)
+    {
+        if (_used == width)
+        {
+            return;
+        }
+
+        _used = width;
+        FitAll(windows);
+    }
+
     /// <summary>Окно отпустили после перетаскивания: можно пробовать снова.</summary>
     public void Moved(IntPtr hwnd)
     {
@@ -55,14 +71,32 @@ public sealed class StripFit
     /// <summary>Подогнать всё, что зашло на ленту. Пока кнопка мыши нажата, не трогаем: окно могут как раз тащить.</summary>
     public void FitAll(IEnumerable<WindowItem> windows)
     {
-        if (_band is not { } band || IsKeyDown(VK_LBUTTON))
+        if (_band is not { } full || _used is not { } used || IsKeyDown(VK_LBUTTON))
         {
             return;
         }
 
+        var band = new RECT(full.Left, full.Top, Math.Min(full.Left + used, full.Right), full.Bottom);
+        RestoreFreed(band);
+
         foreach (var item in windows.ToList())
         {
             Fit(item, band);
+        }
+    }
+
+    /// <summary>Плитки ушли, и прежнему месту окна лента больше не мешает: возвращаем.</summary>
+    private void RestoreFreed(RECT band)
+    {
+        foreach (var (hwnd, saved) in _saved.ToList())
+        {
+            if (!Overlaps(saved.Original, band))
+            {
+                Restore(hwnd, saved);
+                _saved.Remove(hwnd);
+                _gaveUp.Remove(hwnd);
+                _tries.Remove(hwnd);
+            }
         }
     }
 
@@ -154,23 +188,28 @@ public sealed class StripFit
     {
         foreach (var (hwnd, saved) in _saved)
         {
-            if (!IsWindow(hwnd) || IsIconic(hwnd))
-            {
-                continue;
-            }
-
-            GetWindowRect(hwnd, out var r);
-
-            if (Same(r, saved.Applied))
-            {
-                var o = saved.Original;
-                SetWindowPos(hwnd, IntPtr.Zero, o.Left, o.Top, o.Width, o.Height, SWP_NOZORDER | SWP_NOACTIVATE);
-            }
+            Restore(hwnd, saved);
         }
 
         _saved.Clear();
         _gaveUp.Clear();
         _tries.Clear();
+    }
+
+    private static void Restore(IntPtr hwnd, (RECT Original, RECT Applied) saved)
+    {
+        if (!IsWindow(hwnd) || IsIconic(hwnd))
+        {
+            return;
+        }
+
+        GetWindowRect(hwnd, out var r);
+
+        if (Same(r, saved.Applied))
+        {
+            var o = saved.Original;
+            SetWindowPos(hwnd, IntPtr.Zero, o.Left, o.Top, o.Width, o.Height, SWP_NOZORDER | SWP_NOACTIVATE);
+        }
     }
 
     private static bool Overlaps(RECT a, RECT b) => a.Left < b.Right && a.Right > b.Left && a.Top < b.Bottom && a.Bottom > b.Top;

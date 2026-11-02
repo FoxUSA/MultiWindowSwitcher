@@ -661,6 +661,7 @@ public sealed class WindowTracker
     /// <summary>
     /// Имя держится за окном: заголовок нужен только чтобы узнать окно, у которого имени ещё нет (новое окно той же
     /// программы). Одно имя — одному окну: другое окно не заберёт его, даже если его заголовок совпал с правилом.
+    /// В редакторе кода имя держится за проектом: в окне открыли другой проект — имя другое.
     /// </summary>
     private void BindNames()
     {
@@ -669,12 +670,24 @@ public sealed class WindowTracker
 
         foreach (var w in Windows)
         {
-            if (w.NameRule is { } bound && !rules.Contains(bound))
+            if (w.NameRule is { } bound && (!rules.Contains(bound) || !Holds(w, bound)))
             {
                 w.NameRule = null;
             }
 
-            w.NameRule ??= rules.FirstOrDefault(r => r.Hwnd == w.Hwnd.ToInt64() && string.Equals(r.App, w.App, StringComparison.OrdinalIgnoreCase) && !taken.Contains(r));
+            w.NameRule ??= rules.FirstOrDefault(r => r.Hwnd == w.Hwnd.ToInt64() && string.Equals(r.App, w.App, StringComparison.OrdinalIgnoreCase) && !taken.Contains(r) && Holds(w, r));
+
+            if (w.NameRule is { } rule)
+            {
+                taken.Add(rule);
+            }
+        }
+
+        // сначала проект один в один: иначе правило «foo» заберёт окно проекта «foobar»
+        foreach (var w in Windows.Where(w => w.NameRule is null && ProjectOf(w) is not null))
+        {
+            var project = DefaultFragment(w);
+            w.NameRule = rules.FirstOrDefault(r => !taken.Contains(r) && string.Equals(r.App, w.App, StringComparison.OrdinalIgnoreCase) && string.Equals(Clean(r.Fragment), project, StringComparison.OrdinalIgnoreCase));
 
             if (w.NameRule is { } rule)
             {
@@ -694,12 +707,46 @@ public sealed class WindowTracker
 
         foreach (var w in Windows)
         {
-            if (w.NameRule is { } rule && rule.Hwnd != w.Hwnd.ToInt64())
+            if (w.NameRule is not { } rule)
+            {
+                continue;
+            }
+
+            if (rule.Hwnd != w.Hwnd.ToInt64())
             {
                 rule.Hwnd = w.Hwnd.ToInt64();
                 Settings.Touch();
             }
+
+            // правило старое, с названием вкладки: окно нашлось, теперь оно будет узнаваться по проекту
+            if (!rule.ByProject && ProjectOf(w) is not null)
+            {
+                rule.Fragment = DefaultFragment(w);
+                rule.ByProject = true;
+                Settings.Touch();
+            }
         }
+    }
+
+    /// <summary>Заголовок на секунду без проекта (окно загружается) имя не отбирает.</summary>
+    private static bool Holds(WindowItem w, NameRule rule) =>
+        !rule.ByProject || ProjectOf(w) is null || Fits(w, rule.App, rule.Fragment);
+
+    private static readonly HashSet<string> CodeEditors = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "code.exe", "code - insiders.exe", "cursor.exe", "windsurf.exe", "vscodium.exe",
+    };
+
+    /// <summary>Проект в редакторе кода: заголовок «вкладка - проект - Visual Studio Code», вкладка всё время другая, проект — нет.</summary>
+    public static string? ProjectOf(WindowItem w)
+    {
+        if (!CodeEditors.Contains(w.App))
+        {
+            return null;
+        }
+
+        var parts = w.Title.Split(" - ", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return parts.Length >= 2 ? parts[^2].TrimStart('●', ' ') : null;
     }
 
     public static NameRule? RuleFor(WindowItem w) =>
@@ -731,10 +778,10 @@ public sealed class WindowTracker
     public string KeyFragment(WindowItem w) =>
         Windows.Count(o => string.Equals(o.App, w.App, StringComparison.OrdinalIgnoreCase)) <= 1 ? string.Empty : DefaultFragment(w);
 
-    /// <summary>Часть заголовка по умолчанию: всё до « — » или « - », без названия программы в конце.</summary>
+    /// <summary>Часть заголовка по умолчанию: всё до « — » или « - », без названия программы в конце; в редакторе кода — проект.</summary>
     public static string DefaultFragment(WindowItem w)
     {
-        var title = w.Title.Trim();
+        var title = ProjectOf(w) ?? w.Title.Trim();
 
         foreach (var separator in new[] { " — ", " - ", " | " })
         {

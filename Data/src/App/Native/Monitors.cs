@@ -2,8 +2,11 @@
 
 namespace MultiWindowSwitcher.Native;
 
-/// <summary>Монитор: границы целиком и без панели задач, в физических пикселях.</summary>
-public sealed record MonitorInfo(int Number, string Device, RECT Bounds, RECT Work, bool IsPrimary, double Scale);
+/// <summary>
+/// Монитор: границы целиком и без панели задач, в физических пикселях. Device (\\.\DISPLAY1) Windows раздаёт заново,
+/// когда монитор выключили и включили, — для запоминания монитора есть Id, он у монитора свой.
+/// </summary>
+public sealed record MonitorInfo(int Number, string Device, RECT Bounds, RECT Work, bool IsPrimary, double Scale, string Id);
 
 /// <summary>
 /// Мониторы по порядку: основной — первый, остальные слева направо.
@@ -45,13 +48,53 @@ public static class Monitors
                 info.rcMonitor,
                 info.rcWork,
                 (info.dwFlags & MONITORINFOF_PRIMARY) != 0,
-                scale));
+                scale,
+                IdOf(info.szDevice)));
         }
 
         return result;
     }
 
     public static MonitorInfo Primary() => All().First();
+
+    /// <summary>Запомненный монитор: по Id; имя устройства — только у старых настроек, где Id ещё нет. Не нашёлся — основной.</summary>
+    public static MonitorInfo Find(string id, string device)
+    {
+        var all = All();
+        return (id.Length > 0 ? all.FirstOrDefault(m => m.Id == id) : all.FirstOrDefault(m => m.Device == device)) ?? all.First();
+    }
+
+    /// <summary>Путь монитора как устройства («\\?\DISPLAY#SAM7179#…»): в нём модель и разъём, при переподключении он тот же.</summary>
+    private static string IdOf(string device)
+    {
+        var display = new DISPLAY_DEVICE { cb = System.Runtime.InteropServices.Marshal.SizeOf<DISPLAY_DEVICE>() };
+        return EnumDisplayDevices(device, 0, ref display, EDD_GET_DEVICE_INTERFACE_NAME) ? display.DeviceID : string.Empty;
+    }
+
+    private const uint EDD_GET_DEVICE_INTERFACE_NAME = 1;
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential, CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private struct DISPLAY_DEVICE
+    {
+        public int cb;
+
+        [System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.ByValTStr, SizeConst = 32)]
+        public string DeviceName;
+
+        [System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.ByValTStr, SizeConst = 128)]
+        public string DeviceString;
+
+        public int StateFlags;
+
+        [System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.ByValTStr, SizeConst = 128)]
+        public string DeviceID;
+
+        [System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.ByValTStr, SizeConst = 128)]
+        public string DeviceKey;
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern bool EnumDisplayDevices(string device, uint index, ref DISPLAY_DEVICE display, uint flags);
 
     public static MonitorInfo FromPoint(int x, int y)
     {
