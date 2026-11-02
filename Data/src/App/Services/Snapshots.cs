@@ -14,7 +14,7 @@ namespace MultiWindowSwitcher.Services;
 /// <summary>
 /// Последний снимок окна для программ, которые прячутся в трей. Спрятанное окно Windows не рисует —
 /// живого превью у него нет, поэтому, пока окно на экране, каждые 2 с его тихо снимаем
-/// (PrintWindow, в фоне, уменьшенной копией). Ушло в трей — на плитке остаётся последний снимок.
+/// (PrintWindow, в фоне, уменьшенной копией). Ушло в трей или свернулось — на плитке остаётся последний снимок.
 /// Снимок — на программу (telegram.exe), а не на окно: переживает перезапуск и её, и наш.
 /// На диск (UserData\snapshots) пишем, только когда окно ушло в трей и при выходе: UserData
 /// часто лежит в Dropbox, писать туда каждые 2 с нельзя.
@@ -73,14 +73,14 @@ public sealed class Snapshots
         var all = _windows().ToList();
 
         // окно, которое только что было на экране, ушло в трей — его последний снимок на диск
-        foreach (var item in all.Where(w => w.InTray && _onScreen.Contains(w.App)))
+        foreach (var item in all.Where(w => (w.InTray || w.IsMinimized) && _onScreen.Contains(w.App)))
         {
             _onScreen.Remove(item.App);
             Save(item.App);
         }
 
         var targets = all
-            .Where(w => !w.InTray && !IsHiddenByApp(w.Hwnd) && !IsIconic(w.Hwnd) && TrayIcons.Find(w.AppTitle, w.App, w.Title) is not null)
+            .Where(w => !w.InTray && !w.IsMinimized && !IsHiddenByApp(w.Hwnd) && !IsIconic(w.Hwnd) && TrayIcons.Find(w.AppTitle, w.App, w.Title) is not null)
             .Select(w => (w.Hwnd, w.App))
             .ToList();
 

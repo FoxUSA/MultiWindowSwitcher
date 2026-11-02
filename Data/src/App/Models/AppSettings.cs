@@ -22,6 +22,9 @@ public sealed class NameRule
     public string Fragment { get; set; } = string.Empty;
 
     public string Name { get; set; } = string.Empty;
+
+    /// <summary>Окно, которому имя дано. Пока оно открыто, имя держится за ним, что бы ни было в заголовке, — и после перезапуска переключателя.</summary>
+    public long Hwnd { get; set; }
 }
 
 /// <summary>Закреплённое первым окно — тоже правилом, чтобы пережить перезапуск.</summary>
@@ -178,6 +181,12 @@ public sealed class AppSettings
 
     /// <summary>Лента: None — обычное окно; Top, Bottom — на всю ширину монитора, место на экране зарезервировано.</summary>
     public string Dock { get; set; } = "None";
+
+    /// <summary>
+    /// Резервировать полосу ленты, как панель задач. Выключено — полоса свободна: значки рабочего стола можно ставить
+    /// куда угодно (при резервировании Windows их туда не пускает), а окна под ленту подгоняет StripFit.
+    /// </summary>
+    public bool DockReserve { get; set; }
 
     /// <summary>Монитор ленты (имя устройства).</summary>
     public string DockDevice { get; set; } = string.Empty;

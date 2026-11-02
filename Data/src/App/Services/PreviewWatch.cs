@@ -1,4 +1,4 @@
-using System.Drawing;
+﻿using System.Drawing;
 using System.Drawing.Imaging;
 using MultiWindowSwitcher.Views.Controls;
 using static MultiWindowSwitcher.Native.Win32;
@@ -69,22 +69,30 @@ public sealed class PreviewWatch
         }
     }
 
+    /// <summary>
+    /// Пусто — больше половины проверенных точек цвета подложки. Не все: у окна, потерявшего картинку
+    /// (видели у припаркованного ChatGPT), вверху остаётся полоса, а ниже пусто.
+    /// </summary>
     private static bool IsBlank(Bitmap screen, Rectangle rect)
     {
+        var points = 0;
+        var empty = 0;
+
         foreach (var fx in new[] { 0.55, 0.7, 0.85, 0.95 })
         {
             foreach (var fy in new[] { 0.1, 0.3, 0.5, 0.7, 0.9 })
             {
                 var pixel = screen.GetPixel(rect.Left + (int)(rect.Width * fx), rect.Top + (int)(rect.Height * fy));
+                points++;
 
-                if (Math.Abs(pixel.R - Backdrop) > Tolerance || Math.Abs(pixel.G - Backdrop) > Tolerance || Math.Abs(pixel.B - Backdrop) > Tolerance)
+                if (Math.Abs(pixel.R - Backdrop) <= Tolerance && Math.Abs(pixel.G - Backdrop) <= Tolerance && Math.Abs(pixel.B - Backdrop) <= Tolerance)
                 {
-                    return false;
+                    empty++;
                 }
             }
         }
 
-        return true;
+        return empty * 2 > points;
     }
 
     private void Judge(WindowTile tile, bool blank)

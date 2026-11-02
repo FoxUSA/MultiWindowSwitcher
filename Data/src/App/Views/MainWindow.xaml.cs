@@ -85,7 +85,6 @@ public partial class MainWindow : FluentWindow, ITileHost
         {
             _toast.Stop();
             ToastText.Text = string.Empty;
-            DockToast.IsOpen = false;
         };
         _anim.Tick += (_, _) => AnimateStep();
         _hideTimer.Tick += (_, _) =>
@@ -142,7 +141,8 @@ public partial class MainWindow : FluentWindow, ITileHost
 
         // снимки окон, которые прячутся в трей: живого превью у спрятанного окна нет
         _snapshots = new Snapshots(() => Tracker.Windows);
-        WindowTile.SnapshotOf = item => _snapshots.Of(item);
+        // снимок один на программу: у свёрнутого окна программы с несколькими окнами он был бы чужой — там живое превью
+        WindowTile.SnapshotOf = item => item.InTray || Tracker.Windows.Count(w => w.App == item.App) <= 1 ? _snapshots.Of(item) : null;
         _snapshots.Updated += RepaintSnapshots;
         _snapshots.Start();
         _snapshotAge.Tick += (_, _) => RepaintSnapshots();
@@ -173,6 +173,12 @@ public partial class MainWindow : FluentWindow, ITileHost
         DockMenuTitle.Text = Title;
 
         Tracker.Changed += Rebuild;
+        Tracker.Changed += FitWindowsToStrip;
+        Tracker.MoveSizeEnded += hwnd =>
+        {
+            _stripFit.Moved(hwnd);
+            FitWindowsToStrip();
+        };
         Tracker.Flashed += _ => App.Current.Fab.SetAttention(true);
         Tracker.TrayOpening += item => Toast(Loc.F("ToastTrayOpening", item.AppTitle));
         UpdateService.StateChanged += PaintUpdate;
@@ -534,6 +540,9 @@ public partial class MainWindow : FluentWindow, ITileHost
         App.Current.Fab.SetAttention(alive.Any(w => w.Attention));
         PaintCounts();
 
+        // окно развернули кнопкой или программа сама сдвинула его: об этом Windows отдельно не сообщает
+        FitWindowsToStrip();
+
         // раз в ~3 с: не опустело ли какое-нибудь превью. Смотрим на экран — только когда нас ничего не закрывает
         if (++_slowTicks % 4 == 0 && IsShown && IsVisible && !IsBusy && _dragOrder.Count == 0 && !Tiles.IsMoving && !IsCovered())
         {
@@ -786,13 +795,6 @@ public partial class MainWindow : FluentWindow, ITileHost
         else
         {
             ToastText.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, "BrandBrush");
-        }
-
-        if (_railOn)
-        {
-            DockToastText.Text = text;
-            DockToastText.Foreground = ToastText.Foreground;
-            DockToast.IsOpen = true;
         }
 
         _toast.Stop();
@@ -1137,6 +1139,7 @@ public partial class MainWindow : FluentWindow, ITileHost
         PartFull.IsChecked = WindowTile.TitlePart == "full";
         PartWindow.IsChecked = WindowTile.TitlePart == "window";
         PartApp.IsChecked = WindowTile.TitlePart == "app";
+        DockReserveSwitch.IsChecked = s.DockReserve;
         HoverPreviewSwitch.IsChecked = s.HoverPreview;
         HoverPreviewSizeSlider.Value = Math.Clamp(s.HoverPreviewSize, 30, 90);
         DockWindow.IsChecked = !Docked;
@@ -1467,7 +1470,9 @@ public partial class MainWindow : FluentWindow, ITileHost
 
         if (name.Length > 0)
         {
-            rules.Add(new NameRule { App = item.App, AppTitle = item.AppTitle, Fragment = fragment, Name = name });
+            // имя сразу за этим окном: совпадает его заголовок с правилом или нет
+            item.NameRule = new NameRule { App = item.App, AppTitle = item.AppTitle, Fragment = fragment, Name = name, Hwnd = item.Hwnd.ToInt64() };
+            rules.Add(item.NameRule);
         }
 
         AppLog.Info(name.Length > 0 ? $"Имя «{name}» для {item.App}, в заголовке «{fragment}»." : $"Имя убрано у {item.App}.");

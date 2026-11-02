@@ -64,6 +64,10 @@ public partial class WindowTile : UserControl
     private IntPtr _thumb;
     private RECT _lastDest;
     private bool _lastVisible;
+    private bool _thinLogged;
+
+    /// <summary>Шире этого превью считается ошибкой, а не окном: у свёрнутого окна пропорции около 6:1.</summary>
+    private const int MaxThumbnailAspect = 8;
     private SIZE _source;
     private Point _down;
     private bool _pressed;
@@ -158,7 +162,7 @@ public partial class WindowTile : UserControl
 
     private double SourceAspect()
     {
-        var shot = Item.InTray && Settings.Current.TraySnapshots ? SnapshotOf?.Invoke(Item) : null;
+        var shot = ShowsSnapshot ? SnapshotOf?.Invoke(Item) : null;
         var aspect = shot is { } s && s.Image.PixelHeight > 0 ? (double)s.Image.PixelWidth / s.Image.PixelHeight
             : _source.cx > 0 && _source.cy > 0 ? (double)_source.cx / _source.cy
             : 1.6;
@@ -178,8 +182,11 @@ public partial class WindowTile : UserControl
     /// <summary>Последний снимок окна (для окон в трее): изображение и когда снято.</summary>
     public static Func<WindowItem, (System.Windows.Media.Imaging.BitmapSource Image, DateTime At)?>? SnapshotOf { get; set; }
 
-    /// <summary>Окно в трее, и есть его снимок — показываем снимок вместо значка.</summary>
-    public bool ShowsSnapshot => Item.InTray && Settings.Current.TraySnapshots && SnapshotOf?.Invoke(Item) is not null;
+    /// <summary>
+    /// Окно в трее или свёрнуто, и есть его снимок — показываем снимок. Живое превью свёрнутых окон у таких программ
+    /// ломается: у ChatGPT вместо картинки шла полоса поперёк соседних плиток.
+    /// </summary>
+    public bool ShowsSnapshot => (Item.InTray || Item.IsMinimized) && Settings.Current.TraySnapshots && SnapshotOf?.Invoke(Item) is not null;
 
     /// <summary>Сначала программа: «Google Chrome - Панель» вместо «Панель - Google Chrome».</summary>
     public static bool AppFirst { get; set; } = true;
@@ -246,8 +253,8 @@ public partial class WindowTile : UserControl
     {
         _hostHwnd = hostHwnd;
 
-        // окно в трее невидимо — Windows его не рисует, превью было бы пустым: вместо него значок
-        if (_thumb != IntPtr.Zero || Item.InTray)
+        // окно в трее невидимо — Windows его не рисует, превью было бы пустым: вместо него снимок или значок
+        if (_thumb != IntPtr.Zero || Item.InTray || ShowsSnapshot)
         {
             UpdateThumbnail();
             return;
@@ -370,6 +377,31 @@ public partial class WindowTile : UserControl
 
         var dest = new RECT((int)Math.Round(x), (int)Math.Round(y), (int)Math.Round(x + w), (int)Math.Round(y + h));
 
+        // Полоса поперёк соседних плиток: превью такой формы не бывает полезным. Откуда оно берётся, ещё не поймано —
+        // поэтому не рисуем и пишем в лог, что за окно и какие размеры
+        if (dest.Height > 0 && dest.Width > dest.Height * MaxThumbnailAspect)
+        {
+            if (!_thinLogged)
+            {
+                _thinLogged = true;
+                MultiWindowSwitcher.Services.AppLog.Warn(
+                    $"Превью-полоса не показана: «{Item.Title}» ({Item.App}), окно у DWM {_source.cx}×{_source.cy}, превью {dest.Width}×{dest.Height}, " +
+                    $"область {PreviewHost.ActualWidth:0}×{PreviewHost.ActualHeight:0}, плитка {ActualWidth:0}×{ActualHeight:0}, свёрнуто {IsIconic(Item.Hwnd)}, увеличено {_host.IsPeeking(this)}.");
+            }
+
+            if (_lastVisible)
+            {
+                var hideThin = new DWM_THUMBNAIL_PROPERTIES { dwFlags = DWM_TNP_VISIBLE, fVisible = false };
+                DwmUpdateThumbnailProperties(_thumb, ref hideThin);
+                _lastVisible = false;
+            }
+
+            FallbackIcon.Visibility = Visibility.Visible;
+            return;
+        }
+
+        _thinLogged = false;
+
         if (_lastVisible && dest.Left == _lastDest.Left && dest.Top == _lastDest.Top
             && dest.Right == _lastDest.Right && dest.Bottom == _lastDest.Bottom)
         {
@@ -395,10 +427,10 @@ public partial class WindowTile : UserControl
 
     private void OnItemChanged(object? sender, PropertyChangedEventArgs e)
     {
-        // окно вернули из трея — подключаем живое превью; ушло в трей — убираем пустое
-        if (e.PropertyName == nameof(WindowItem.InTray) && _hostHwnd != IntPtr.Zero)
+        // окно вернули из трея или развернули — живое превью; ушло в трей или свернулось — снимок
+        if (e.PropertyName is nameof(WindowItem.InTray) or nameof(WindowItem.IsMinimized) && _hostHwnd != IntPtr.Zero)
         {
-            if (Item.InTray)
+            if (Item.InTray || ShowsSnapshot)
             {
                 Detach();
                 UpdateThumbnail();
@@ -520,7 +552,7 @@ public partial class WindowTile : UserControl
     /// <summary>Окно в трее: последний снимок и сколько ему минут; снимка нет — крупный значок.</summary>
     public void PaintSnapshot()
     {
-        var shot = Item.InTray && Settings.Current.TraySnapshots ? SnapshotOf?.Invoke(Item) : null;
+        var shot = ShowsSnapshot ? SnapshotOf?.Invoke(Item) : null;
 
         if (shot is { } s)
         {
@@ -566,6 +598,7 @@ public partial class WindowTile : UserControl
     {
         MonitorBadge.Visibility = ShowMonitor && !Compact ? Visibility.Visible : Visibility.Collapsed;
         StateChip.Visibility = Compact ? Visibility.Collapsed : Visibility.Visible;
+        ActiveDot.Visibility = Compact && Item.IsActive && !Item.IsMinimized ? Visibility.Visible : Visibility.Collapsed;
 
         if (ActualWidth <= 0)
         {

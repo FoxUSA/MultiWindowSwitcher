@@ -77,6 +77,7 @@ public sealed class WindowTracker
 
         _hookProc = OnWinEvent;
         Hook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND);
+        Hook(EVENT_SYSTEM_MOVESIZEEND, EVENT_SYSTEM_MOVESIZEEND);
         Hook(EVENT_SYSTEM_MINIMIZESTART, EVENT_SYSTEM_MINIMIZEEND);
         Hook(EVENT_OBJECT_DESTROY, EVENT_OBJECT_HIDE);
 
@@ -129,6 +130,11 @@ public sealed class WindowTracker
         }
     }
 
+    private const uint EVENT_SYSTEM_MOVESIZEEND = 0x000B;
+
+    /// <summary>Человек отпустил окно после перетаскивания или изменения размера.</summary>
+    public event Action<IntPtr>? MoveSizeEnded;
+
     private void HandleWinEvent(uint evt, IntPtr hwnd, int idObject, int idChild)
     {
         if (idObject != OBJID_WINDOW || idChild != 0 || hwnd == IntPtr.Zero)
@@ -140,6 +146,11 @@ public sealed class WindowTracker
         {
             case EVENT_SYSTEM_FOREGROUND:
                 OnForeground(hwnd);
+                break;
+
+            case EVENT_SYSTEM_MOVESIZEEND:
+                MoveSizeEnded?.Invoke(hwnd);
+                RefreshSoon();
                 break;
 
             case EVENT_SYSTEM_MINIMIZESTART:
@@ -627,9 +638,11 @@ public sealed class WindowTracker
         var settings = Settings.Current;
         var changed = false;
 
+        BindNames();
+
         foreach (var w in Windows)
         {
-            var name = RuleFor(w)?.Name ?? string.Empty;
+            var name = w.NameRule?.Name ?? string.Empty;
             var pinned = settings.Pins.Any(p => Fits(w, p.App, p.Fragment));
             var wide = settings.Wides.Any(p => Fits(w, p.App, p.Fragment));
 
@@ -645,8 +658,54 @@ public sealed class WindowTracker
         return changed;
     }
 
+    /// <summary>
+    /// Имя держится за окном: заголовок нужен только чтобы узнать окно, у которого имени ещё нет (новое окно той же
+    /// программы). Одно имя — одному окну: другое окно не заберёт его, даже если его заголовок совпал с правилом.
+    /// </summary>
+    private void BindNames()
+    {
+        var rules = Settings.Current.Names;
+        var taken = new HashSet<NameRule>();
+
+        foreach (var w in Windows)
+        {
+            if (w.NameRule is { } bound && !rules.Contains(bound))
+            {
+                w.NameRule = null;
+            }
+
+            w.NameRule ??= rules.FirstOrDefault(r => r.Hwnd == w.Hwnd.ToInt64() && string.Equals(r.App, w.App, StringComparison.OrdinalIgnoreCase) && !taken.Contains(r));
+
+            if (w.NameRule is { } rule)
+            {
+                taken.Add(rule);
+            }
+        }
+
+        foreach (var w in Windows.Where(w => w.NameRule is null))
+        {
+            w.NameRule = rules.FirstOrDefault(r => !taken.Contains(r) && Fits(w, r.App, r.Fragment));
+
+            if (w.NameRule is { } rule)
+            {
+                taken.Add(rule);
+            }
+        }
+
+        foreach (var w in Windows)
+        {
+            if (w.NameRule is { } rule && rule.Hwnd != w.Hwnd.ToInt64())
+            {
+                rule.Hwnd = w.Hwnd.ToInt64();
+                Settings.Touch();
+            }
+        }
+    }
+
     public static NameRule? RuleFor(WindowItem w) =>
-        Settings.Current.Names.FirstOrDefault(r => Fits(w, r.App, r.Fragment));
+        w.NameRule is { } bound && Settings.Current.Names.Contains(bound)
+            ? bound
+            : Settings.Current.Names.FirstOrDefault(r => Fits(w, r.App, r.Fragment));
 
     public static PinRule? PinFor(WindowItem w) =>
         Settings.Current.Pins.FirstOrDefault(p => Fits(w, p.App, p.Fragment));

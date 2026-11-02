@@ -81,7 +81,21 @@ public partial class MainWindow
     }
 
     /// <summary>Отдать зарезервированную полосу обратно: при скрытии и при выходе.</summary>
-    public void ReleaseDock() => AppBar.Remove(_hwnd);
+    public void ReleaseDock()
+    {
+        AppBar.Remove(_hwnd);
+        _stripFit.Release();
+    }
+
+    private readonly StripFit _stripFit = new();
+
+    private void FitWindowsToStrip()
+    {
+        if (_railOn && IsShown)
+        {
+            _stripFit.FitAll(Tracker.Windows);
+        }
+    }
 
     private MonitorInfo DockMonitor() =>
         Monitors.All().FirstOrDefault(m => m.Device == Settings.Current.DockDevice) ?? Monitors.Primary();
@@ -94,8 +108,13 @@ public partial class MainWindow
         var s = Settings.Current;
         var monitor = DockMonitor();
 
+        ApplyDockMargins();
         AppBar.Register(_hwnd, AppBarMessage);
-        var rect = AppBar.Place(_hwnd, monitor, s.Dock == "Top", DockPixels(monitor));
+
+        // зарегистрирована панель всегда: так приходит сигнал о полноэкранных окнах. Место занимает, только если просили
+        var rect = s.DockReserve
+            ? AppBar.Place(_hwnd, monitor, s.Dock == "Top", DockPixels(monitor))
+            : AppBar.Where(_hwnd, monitor, s.Dock == "Top", DockPixels(monitor));
 
         if (!SameRect(rect, _target))
         {
@@ -104,6 +123,7 @@ public partial class MainWindow
 
         _target = rect;
         SetWindowPos(_hwnd, HWND_TOPMOST, rect.Left, rect.Top, rect.Width, rect.Height, SWP_NOACTIVATE);
+        _stripFit.Apply(rect, s.Dock == "Top", Tracker.Windows);
     }
 
     private static bool SameRect(RECT a, RECT b) =>
@@ -235,10 +255,7 @@ public partial class MainWindow
         var corners = on ? DWMWCP_DONOTROUND : DWMWCP_DEFAULT;
         DwmSetWindowAttribute(_hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, ref corners, sizeof(int));
 
-        // у края, который тянут мышью, — зазор: иначе он отбирает клики у плиток
-        var grip = (int)DockGrip + 2;
-        TilesHost.Margin = !on ? new Thickness(12, 0, 12, 0)
-            : Settings.Current.Dock == "Top" ? new Thickness(2, 6, 6, grip) : new Thickness(2, grip, 6, 6);
+        ApplyDockMargins();
 
         MinHeight = on ? DockMinHeight : 320;
         Topmost = on || Settings.Current.Topmost;
@@ -252,6 +269,18 @@ public partial class MainWindow
         }
 
         Tiles.InvalidateMeasure();
+    }
+
+    /// <summary>
+    /// У края, который тянут мышью, — зазор: иначе он отбирает клики у плиток. Кнопки начинаются вровень с плитками.
+    /// Зависит от края ленты, поэтому и при смене верх/низ.
+    /// </summary>
+    private void ApplyDockMargins()
+    {
+        var grip = (int)DockGrip + 2;
+        TilesHost.Margin = !_railOn ? new Thickness(12, 0, 12, 0)
+            : Settings.Current.Dock == "Top" ? new Thickness(2, 6, 6, grip) : new Thickness(2, grip, 6, 6);
+        DockRail.Margin = new Thickness(6, TilesHost.Margin.Top, 4, 0);
     }
 
     private void OnRailHide(object sender, RoutedEventArgs e) => HideSwitcher();
@@ -362,10 +391,10 @@ public partial class MainWindow
         var scale = VisualTreeHelper.GetDpi(this).DpiScaleX;
         var left = tile.PointToScreen(new Point(0, 0)).X;
         var right = left + tile.ActualWidth * scale;
-        var snapshot = tile.Item.InTray ? WindowTile.SnapshotOf?.Invoke(tile.Item)?.Image : null;
+        var snapshot = tile.ShowsSnapshot ? WindowTile.SnapshotOf?.Invoke(tile.Item)?.Image : null;
 
         _hoverPreview ??= new HoverPreview();
-        _hoverPreview.ShowFor(tile.Item, snapshot, (int)left, (int)right, DockMonitor(), Settings.Current.Dock == "Top", Math.Clamp(Settings.Current.HoverPreviewSize, 30, 90) / 100);
+        _hoverPreview.ShowFor(tile.Item, snapshot, (int)left, (int)right, DockMonitor(), Settings.Current.Dock == "Top", Math.Clamp(Settings.Current.HoverPreviewSize, 30, 90) / 100, _target);
     }
 
     private void HideHover()
@@ -381,6 +410,20 @@ public partial class MainWindow
         if (_hoverTile == tile)
         {
             HideHover();
+        }
+    }
+
+    private void OnDockReserveSwitch(object sender, RoutedEventArgs e)
+    {
+        Settings.Current.DockReserve = DockReserveSwitch.IsChecked == true;
+        Settings.Touch();
+        AppLog.Info($"Резервировать место под ленту: {(Settings.Current.DockReserve ? "вкл" : "выкл")}.");
+
+        if (_railOn && IsShown)
+        {
+            // занятое место отдаётся только снятием панели
+            ReleaseDock();
+            PlaceDock();
         }
     }
 
@@ -434,7 +477,7 @@ public partial class MainWindow
         var monitor = _railOn ? DockMonitor() : Monitors.FromWindow(_hwnd);
 
         _hoverPreview ??= new HoverPreview();
-        _hoverPreview.ShowFor(sample.Item, null, 0, 0, monitor, Settings.Current.Dock != "Bottom", Math.Clamp(Settings.Current.HoverPreviewSize, 30, 90) / 100, edge);
+        _hoverPreview.ShowFor(sample.Item, null, 0, 0, monitor, Settings.Current.Dock != "Bottom", Math.Clamp(Settings.Current.HoverPreviewSize, 30, 90) / 100, _railOn ? _target : null, edge);
         SetWindowPos(popup.Handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 
         _sizeDemoTimer.Stop();

@@ -59,6 +59,9 @@ public sealed class WindowItem : ObservableObject
         }
     }
 
+    /// <summary>Правило, за которым закреплено это открытое окно: заголовок больше не важен, пока окно не закрыли.</summary>
+    public NameRule? NameRule { get; set; }
+
     /// <summary>Своё имя окна из правил; пусто — нет.</summary>
     public string Name
     {

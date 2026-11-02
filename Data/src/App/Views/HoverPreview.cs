@@ -71,14 +71,27 @@ public sealed class HoverPreview : Window
     /// <param name="monitor">Монитор ленты.</param>
     /// <param name="top">Лента вверху: превью под ней; внизу — над ней.</param>
     /// <param name="share">Доля рабочей области, 0..1.</param>
+    /// <param name="strip">Где стоит лента: рабочая область без неё, даже если место не зарезервировано.</param>
     /// <param name="leftEdge">Поставить левым краем сюда, а не напротив плитки.</param>
-    public void ShowFor(WindowItem item, BitmapSource? snapshot, int tileLeft, int tileRight, MonitorInfo monitor, bool top, double share, int? leftEdge = null)
+    public void ShowFor(WindowItem item, BitmapSource? snapshot, int tileLeft, int tileRight, MonitorInfo monitor, bool top, double share, RECT? strip, int? leftEdge = null)
     {
         Release();
 
         // рабочая область свежая: её только что уменьшила сама лента
         var work = Monitors.All().FirstOrDefault(m => m.Device == monitor.Device)?.Work ?? monitor.Work;
-        var live = !item.InTray && !IsHiddenByApp(item.Hwnd);
+
+        if (strip is { } band)
+        {
+            if (top)
+            {
+                work.Top = Math.Max(work.Top, band.Bottom);
+            }
+            else
+            {
+                work.Bottom = Math.Min(work.Bottom, band.Top);
+            }
+        }
+        var live = snapshot is null && !item.InTray && !IsHiddenByApp(item.Hwnd);
         var size = default(SIZE);
 
         if (live && DwmRegisterThumbnail(_hwnd, item.Hwnd, out _thumb) == 0)

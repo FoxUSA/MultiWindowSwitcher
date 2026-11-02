@@ -427,25 +427,6 @@
         </Border>
       </Popup>
 
-      <!--  в ленте нет строки состояния: сообщения всплывают рядом с кнопками  -->
-      <Popup
-        x:Name="DockToast"
-        AllowsTransparency="True"
-        IsHitTestVisible="False"
-        Placement="Right"
-        PlacementTarget="{Binding ElementName=DockRail}"
-        StaysOpen="True">
-        <Border
-          Margin="8,6,0,0"
-          Padding="12,6"
-          Background="{StaticResource PopupBrush}"
-          BorderBrush="{StaticResource PopupStrokeBrush}"
-          BorderThickness="1"
-          CornerRadius="8">
-          <TextBlock x:Name="DockToastText" FontSize="12" />
-        </Border>
-      </Popup>
-
       <!--  настройки: всплывают поверх превью (отдельное окно Popup — превью DWM его не перекрывает)  -->
       <Popup
         x:Name="SettingsPopup"
@@ -558,6 +539,11 @@
               </StackPanel>
             </Border>
             <TextBlock Style="{StaticResource ViewTip}" Text="{core:T DockTip}" />
+            <ui:ToggleSwitch
+              x:Name="DockReserveSwitch"
+              Click="OnDockReserveSwitch"
+              Content="{core:T DockReserve}" />
+            <TextBlock Style="{StaticResource ViewTip}" Text="{core:T DockReserveTip}" />
             <ui:ToggleSwitch
               x:Name="HoverPreviewSwitch"
               Click="OnHoverPreviewSwitch"
