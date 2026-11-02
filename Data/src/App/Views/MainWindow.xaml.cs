@@ -85,6 +85,7 @@ public partial class MainWindow : FluentWindow, ITileHost
         {
             _toast.Stop();
             ToastText.Text = string.Empty;
+            DockToast.IsOpen = false;
         };
         _anim.Tick += (_, _) => AnimateStep();
         _hideTimer.Tick += (_, _) =>
@@ -105,6 +106,7 @@ public partial class MainWindow : FluentWindow, ITileHost
         CornersPopup.Closed += (_, _) => App.Current.Gestures?.CancelCapture();
         SettingsPopup.Closed += (_, _) => App.Current.Gestures?.CancelCapture();
         SettingsPopup.Opened += (_, _) => BuildSettings();
+        WireDockMenu();
     }
 
     private WindowTracker Tracker => App.Current.Tracker;
@@ -168,6 +170,7 @@ public partial class MainWindow : FluentWindow, ITileHost
 
         Title = $"Multi Window Switcher {AppVersion.Version}";
         Bar.Title = Title;
+        DockMenuTitle.Text = Title;
 
         Tracker.Changed += Rebuild;
         Tracker.Flashed += _ => App.Current.Fab.SetAttention(true);
@@ -202,6 +205,12 @@ public partial class MainWindow : FluentWindow, ITileHost
         _anim.Stop();
         _hiding = false;
         _side = side;
+
+        if (Docked)
+        {
+            ShowDocked(reason);
+            return;
+        }
 
 
         var cursor = CursorPos();
@@ -263,6 +272,12 @@ public partial class MainWindow : FluentWindow, ITileHost
         CornersPopup.IsOpen = false;
         RenamePopup.IsOpen = false;
         Unpeek();
+
+        if (Docked)
+        {
+            HideDocked();
+            return;
+        }
 
         _hiding = true;
         _watch.Stop();
@@ -388,7 +403,8 @@ public partial class MainWindow : FluentWindow, ITileHost
     /// <summary>Запомнить, где и какого размера окно, — в долях монитора.</summary>
     public void SavePlacement()
     {
-        if (_hwnd == IntPtr.Zero || !IsShown || _hiding)
+        // у ленты своё место: положение обычного окна остаётся на потом, когда ленту выключат
+        if (_hwnd == IntPtr.Zero || !IsShown || _hiding || Docked)
         {
             return;
         }
@@ -443,6 +459,13 @@ public partial class MainWindow : FluentWindow, ITileHost
 
     private void Watch()
     {
+        // лента стоит на месте, пока её не спрячут явно
+        if (Docked)
+        {
+            WatchDockMenu();
+            return;
+        }
+
         if (!IsShown || _hiding || _anim.IsEnabled)
         {
             return;
@@ -521,6 +544,11 @@ public partial class MainWindow : FluentWindow, ITileHost
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
+        if (DockMessage(hwnd, msg, wParam, lParam, ref handled) is { } answer)
+        {
+            return answer;
+        }
+
         switch (msg)
         {
             case WM_ENTERSIZEMOVE:
@@ -537,7 +565,16 @@ public partial class MainWindow : FluentWindow, ITileHost
             case WM_EXITSIZEMOVE:
                 _resizing = false;
                 _armed = true;
-                SavePlacement();
+
+                if (Docked)
+                {
+                    FinishDockResize();
+                }
+                else
+                {
+                    SavePlacement();
+                }
+
                 break;
         }
 
@@ -609,6 +646,7 @@ public partial class MainWindow : FluentWindow, ITileHost
         {
             var tile = _tiles[gone];
             tile.Detach();
+            ForgetHover(tile);
             Tiles.Children.Remove(tile);
             _tiles.Remove(gone);
 
@@ -750,6 +788,13 @@ public partial class MainWindow : FluentWindow, ITileHost
             ToastText.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, "BrandBrush");
         }
 
+        if (_railOn)
+        {
+            DockToastText.Text = text;
+            DockToastText.Foreground = ToastText.Foreground;
+            DockToast.IsOpen = true;
+        }
+
         _toast.Stop();
         _toast.Start();
     }
@@ -762,7 +807,7 @@ public partial class MainWindow : FluentWindow, ITileHost
 
     private void FitBars()
     {
-        if (!IsLoaded)
+        if (!IsLoaded || _railOn)
         {
             return;
         }
@@ -960,6 +1005,7 @@ public partial class MainWindow : FluentWindow, ITileHost
         Settings.Touch();
         AppLog.Info($"Крупные значки: {(Settings.Current.BigIcons ? "вкл" : "выкл")}.");
         SyncIcons();
+        RefreshStrip();
     }
 
     private void OnIconSizeChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -976,9 +1022,19 @@ public partial class MainWindow : FluentWindow, ITileHost
             return;
         }
 
-        Settings.Current.IconSize = e.NewValue;
+        // у ленты и обычного окна размер свой
+        if (_railOn)
+        {
+            Settings.Current.StripIconSize = e.NewValue;
+        }
+        else
+        {
+            Settings.Current.IconSize = e.NewValue;
+        }
+
         Settings.Touch();
         SyncIcons();
+        RefreshStrip();
     }
 
     private void SetBigTitles(bool value)
@@ -1081,7 +1137,14 @@ public partial class MainWindow : FluentWindow, ITileHost
         PartFull.IsChecked = WindowTile.TitlePart == "full";
         PartWindow.IsChecked = WindowTile.TitlePart == "window";
         PartApp.IsChecked = WindowTile.TitlePart == "app";
-        IconSizeSlider.Value = Math.Clamp(s.IconSize, 32, 192);
+        HoverPreviewSwitch.IsChecked = s.HoverPreview;
+        HoverPreviewSizeSlider.Value = Math.Clamp(s.HoverPreviewSize, 30, 90);
+        DockWindow.IsChecked = !Docked;
+        DockTop.IsChecked = s.Dock == "Top";
+        DockBottom.IsChecked = s.Dock == "Bottom";
+        // в ленте значок упирается в её высоту: ползунок только до предела, у которого значок ещё растёт
+        IconSizeSlider.Maximum = _railOn ? Math.Clamp(Tiles.ActualHeight - 32 - WindowTile.IconPad * 2, 40, 192) : 192;
+        IconSizeSlider.Value = Math.Clamp(_railOn ? s.StripIconSize : s.IconSize, 32, IconSizeSlider.Maximum);
         _suppressUi = suppress;
 
         TitleSizeText.Text = $"{TitleSizeSlider.Value:0}%";
@@ -1130,7 +1193,7 @@ public partial class MainWindow : FluentWindow, ITileHost
     private void OnTopmostToggle(object sender, RoutedEventArgs e)
     {
         Settings.Current.Topmost = TopmostSwitch.IsChecked == true;
-        Topmost = Settings.Current.Topmost;
+        Topmost = Settings.Current.Topmost || _railOn;
         Settings.Touch();
     }
 
@@ -1232,6 +1295,8 @@ public partial class MainWindow : FluentWindow, ITileHost
     /// <summary>Клик по плитке: как на панели задач — окно уже впереди сворачивается, иначе выходит вперёд.</summary>
     public void TileClicked(WindowItem item)
     {
+        HideHover();
+
         if (!Tracker.IsInFront(item) || IsHiddenBehindMe(item))
         {
             SwitchTo(item);
@@ -1271,6 +1336,12 @@ public partial class MainWindow : FluentWindow, ITileHost
         Tracker.Activate(item);
         Toast(Loc.F("ToastSwitched", item.Caption));
 
+        // лента занимает своё место и никому не мешает
+        if (Docked)
+        {
+            return;
+        }
+
         // окно выбрано — уезжаем за край, не мешаем
         if (Settings.Current.AutoHide)
         {
@@ -1287,6 +1358,11 @@ public partial class MainWindow : FluentWindow, ITileHost
     /// </summary>
     private void StandBelow(WindowItem item, bool fromTray)
     {
+        if (Docked)
+        {
+            return;
+        }
+
         SetWindowPos(_hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 
         if (!fromTray)
@@ -1457,6 +1533,8 @@ public partial class MainWindow : FluentWindow, ITileHost
 
     public void Peek(WindowTile tile)
     {
+        HideHover();
+
         if (_peek == tile)
         {
             return;
@@ -1548,6 +1626,7 @@ public partial class MainWindow : FluentWindow, ITileHost
     /// </summary>
     public void TileDragStart(WindowTile tile, Point grab)
     {
+        HideHover();
         Unpeek();
         _dragGrab = grab;
         _dragOrder = Tiles.Ordered.ToList();

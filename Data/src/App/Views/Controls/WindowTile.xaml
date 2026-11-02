@@ -21,7 +21,7 @@
         <RowDefinition Height="30" />
         <RowDefinition Height="Auto" />
         <RowDefinition Height="*" />
-        <RowDefinition Height="30" />
+        <RowDefinition x:Name="FootRow" Height="30" />
       </Grid.RowDefinitions>
 
       <Border
@@ -107,6 +107,29 @@
             Visibility="Collapsed"
             Margin="4,0,0,0"
             Orientation="Horizontal">
+            <!--  в ленте нижней полосы нет: её кнопки здесь  -->
+            <StackPanel x:Name="CompactActions" Orientation="Horizontal" Visibility="Collapsed">
+              <Button
+                x:Name="CompactMonitor"
+                Click="OnNextMonitor"
+                Style="{StaticResource IconButton}"
+                ToolTip="{core:T NextMonitorTip}">
+                <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Text="&#xE7F4;" />
+              </Button>
+              <Button
+                Click="OnRename"
+                Content="✎"
+                FontSize="15"
+                Style="{StaticResource IconButton}"
+                ToolTip="{core:T RenameTip}" />
+              <Button
+                x:Name="CompactPin"
+                Click="OnPin"
+                Content="★"
+                FontSize="15"
+                Style="{StaticResource IconButton}"
+                ToolTip="{core:T PinTip}" />
+            </StackPanel>
             <!--  двойная ширина: окно занимает две ячейки сетки — стрелка «шире» между чертами  -->
             <Button
               x:Name="WideButton"
@@ -124,6 +147,7 @@
             </Button>
             <!--  посмотреть крупнее — лупа с плюсом  -->
             <Button
+              x:Name="PeekButton"
               Click="OnPeek"
               Style="{StaticResource IconButton}"
               ToolTip="{core:T PeekTip}">
@@ -231,6 +255,7 @@
       <!--  поверх превью класть нельзя (его рисует DWM), поэтому своя полоса снизу:
             слева — на следующий монитор, справа карандаш и избранное — при наведении; включённое избранное видно всегда  -->
       <Border
+        x:Name="FootBar"
         Grid.Row="3"
         Background="{StaticResource TileHeaderBrush}"
         BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"

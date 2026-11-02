@@ -27,6 +27,8 @@ public interface ITileHost
 
     void ToggleWide(WindowItem item);
 
+    void TileHover(WindowTile tile, bool over);
+
     void MoveToNextMonitor(WindowItem item);
 
     void Peek(WindowTile tile);
@@ -97,9 +99,25 @@ public partial class WindowTile : UserControl
         {
             FitName();
             PaintCompact();
+            ApplyCompactPreview();
         };
         Unloaded += (_, _) => Detach();
 
+        ApplyCompact();
+    }
+
+    /// <summary>Перестроить плитку под обычный вид или ленту.</summary>
+    public void ApplyCompact()
+    {
+        FootRow.Height = new GridLength(Compact ? 0 : 30);
+        FootBar.Visibility = Compact ? Visibility.Collapsed : Visibility.Visible;
+        CompactActions.Visibility = Compact ? Visibility.Visible : Visibility.Collapsed;
+
+        // в ленте шапка узкая: двойная ширина там ни к чему, а вместо лупы — большое превью при наведении.
+        // Заголовку разрешено уступить место кнопкам целиком
+        WideButton.Visibility = PeekButton.Visibility = Compact ? Visibility.Collapsed : Visibility.Visible;
+        TitleText.MinWidth = Compact ? 0 : 48;
+        ApplyCompactPreview();
         Paint();
     }
 
@@ -112,6 +130,50 @@ public partial class WindowTile : UserControl
 
     /// <summary>Заголовки окон без своего имени показываются крупно, на месте имени.</summary>
     public static bool BigTitles { get; set; }
+
+    /// <summary>Лента: в высоту только окно — от плитки остаётся одна шапка, имя в ней же.</summary>
+    public static bool Compact { get; set; }
+
+    /// <summary>Лента: поле вокруг значка программы.</summary>
+    public const double IconPad = 6;
+
+    /// <summary>Лента: плитка не уже пяти кнопок шапки при наведении; маленький значок в шапке есть, только если нет крупного.</summary>
+    private static double CompactMinWidth => Settings.Current.BigIcons ? 141 : 165;
+
+    /// <summary>В ленте крупный значок уже стоит у превью — второй в шапке не нужен.</summary>
+    private static bool HeaderIconHidden => Compact && Settings.Current.BigIcons;
+
+    /// <summary>Лента: сколько места занимает значок слева от превью при такой высоте превью.</summary>
+    public static double IconZoneFor(double previewHeight) =>
+        Settings.Current.BigIcons ? Math.Max(0, Math.Min(Settings.Current.StripIconSize, previewHeight - IconPad * 2)) + IconPad * 2 : 0;
+
+    /// <summary>Лента: ширина плитки — значок и сразу превью в пропорциях окна.</summary>
+    public double CompactWidth(double cellHeight)
+    {
+        var preview = cellHeight - 32; // шапка и рамка
+        // справа только рамка и поле превью: плитка кончается сразу за картинкой
+        var width = IconZoneFor(preview) + Math.Max(0, preview - 8) * SourceAspect() + 7;
+        return Math.Max(CompactMinWidth, width);
+    }
+
+    private double SourceAspect()
+    {
+        var shot = Item.InTray && Settings.Current.TraySnapshots ? SnapshotOf?.Invoke(Item) : null;
+        var aspect = shot is { } s && s.Image.PixelHeight > 0 ? (double)s.Image.PixelWidth / s.Image.PixelHeight
+            : _source.cx > 0 && _source.cy > 0 ? (double)_source.cx / _source.cy
+            : 1.6;
+        return Math.Clamp(aspect, 0.3, 4);
+    }
+
+    /// <summary>Снимок и запасной значок в ленте — тоже рядом со значком слева, а не по центру.</summary>
+    private void ApplyCompactPreview()
+    {
+        var left = Compact ? Math.Max(4, IconZoneFor(PreviewHost.ActualHeight)) : 4;
+        Snapshot.Margin = new Thickness(left, 4, 4, 4);
+        Snapshot.HorizontalAlignment = Compact ? HorizontalAlignment.Left : HorizontalAlignment.Stretch;
+        FallbackIcon.Margin = new Thickness(Compact ? 4 : 0);
+        FallbackIcon.HorizontalAlignment = Compact ? HorizontalAlignment.Left : HorizontalAlignment.Stretch;
+    }
 
     /// <summary>Последний снимок окна (для окон в трее): изображение и когда снято.</summary>
     public static Func<WindowItem, (System.Windows.Media.Imaging.BitmapSource Image, DateTime At)?>? SnapshotOf { get; set; }
@@ -274,15 +336,24 @@ public partial class WindowTile : UserControl
 
         if (querySize || _source.cx <= 0)
         {
+            var was = _source;
             DwmQueryThumbnailSourceSize(_thumb, out _source);
+
+            // в ленте ширина плитки зависит от пропорций окна
+            if (Compact && (was.cx != _source.cx || was.cy != _source.cy))
+            {
+                (VisualTreeHelper.GetParent(this) as UIElement)?.InvalidateMeasure();
+            }
         }
 
         var toDevice = source!.CompositionTarget.TransformToDevice;
         var topLeft = PreviewHost.TransformToAncestor(window!).Transform(new Point(0, 0));
         var inset = 4.0;
-        var x = (topLeft.X + inset) * toDevice.M11;
+        // в ленте слева значок, превью сразу за ним
+        var left = Compact ? Math.Max(inset, IconZoneFor(PreviewHost.ActualHeight)) : inset;
+        var x = (topLeft.X + left) * toDevice.M11;
         var y = (topLeft.Y + inset) * toDevice.M22;
-        var w = Math.Max(1, (PreviewHost.ActualWidth - inset * 2) * toDevice.M11);
+        var w = Math.Max(1, (PreviewHost.ActualWidth - left - inset) * toDevice.M11);
         var h = Math.Max(1, (PreviewHost.ActualHeight - inset * 2) * toDevice.M22);
 
         // вписываем окно-источник в ячейку, не растягивая
@@ -291,7 +362,7 @@ public partial class WindowTile : UserControl
             var scale = Math.Min(w / _source.cx, h / _source.cy);
             var fw = _source.cx * scale;
             var fh = _source.cy * scale;
-            x += (w - fw) / 2;
+            x += Compact ? 0 : (w - fw) / 2;
             y += (h - fh) / 2;
             w = fw;
             h = fh;
@@ -343,15 +414,16 @@ public partial class WindowTile : UserControl
 
     private void Paint()
     {
-        TitleText.Text = Display(Item.Title);
+        TitleText.Text = Compact && Item.HasName ? Item.Name : Display(Item.Title);
         TitleText.ToolTip = Item.Title;
         AppIcon.Source = Item.Icon;
+        AppIcon.Visibility = HeaderIconHidden ? Visibility.Collapsed : Visibility.Visible;
         FallbackIcon.Source = Item.InTray ? MultiWindowSwitcher.Services.BigIcons.Of(Item) : Item.Icon;
-        FallbackIcon.Width = FallbackIcon.Height = Item.InTray ? 96 : 64;
+        FallbackIcon.Width = FallbackIcon.Height = Compact ? double.NaN : Item.InTray ? 96 : 64;
         PaintSnapshot();
         FallbackIcon.Opacity = Item.InTray ? 0.9 : 0.55;
 
-        var banner = Item.HasName || ShowsTitleBanner;
+        var banner = !Compact && (Item.HasName || ShowsTitleBanner);
         Banner.Visibility = banner ? Visibility.Visible : Visibility.Collapsed;
         NameText.Text = Item.HasName ? Item.Name : Display(Item.Title);
 
@@ -369,6 +441,8 @@ public partial class WindowTile : UserControl
         WideButton.Foreground = Item.IsWide ? (Brush)FindResource("BrandBrush") : (Brush)FindResource("TextFillColorSecondaryBrush");
         WideButton.ToolTip = Loc.T(Item.IsWide ? "WideOffTip" : "WideTip");
         PinButton.Foreground = Item.IsPinned ? new SolidColorBrush(Color.FromRgb(0xFD, 0xC7, 0x2F)) : (Brush)FindResource("TextFillColorSecondaryBrush");
+        CompactPin.Foreground = PinButton.Foreground;
+        CompactMonitor.Visibility = ShowMonitor ? Visibility.Visible : Visibility.Collapsed;
         PaintHoverButtons();
         AttentionChip.Visibility = Item.Attention ? Visibility.Visible : Visibility.Collapsed;
 
@@ -452,7 +526,7 @@ public partial class WindowTile : UserControl
         {
             Snapshot.Source = s.Image;
             Snapshot.Visibility = Visibility.Visible;
-            SnapshotAge.Visibility = Visibility.Visible;
+            SnapshotAge.Visibility = Compact ? Visibility.Collapsed : Visibility.Visible;
             var minutes = (int)(DateTime.Now - s.At).TotalMinutes;
             SnapshotAgeText.Text = minutes < 1 ? Loc.T("SnapNow") : Loc.F("SnapAgo", minutes);
             FallbackIcon.Visibility = Visibility.Collapsed;
@@ -484,13 +558,14 @@ public partial class WindowTile : UserControl
     }
 
     /// <summary>
-    /// Метки (событие, монитор, состояние) не прячутся никогда: не влезают — уменьшаются целиком.
+    /// Метки (событие, монитор, состояние) в обычном виде не прячутся: не влезают — уменьшаются целиком.
     /// Место — ширина шапки минус значок программы, поля и, если он виден, мелкий заголовок.
+    /// В ленте монитора и состояния нет: в шапке только название окна.
     /// </summary>
     private void PaintCompact()
     {
-        MonitorBadge.Visibility = ShowMonitor ? Visibility.Visible : Visibility.Collapsed;
-        StateChip.Visibility = Visibility.Visible;
+        MonitorBadge.Visibility = ShowMonitor && !Compact ? Visibility.Visible : Visibility.Collapsed;
+        StateChip.Visibility = Compact ? Visibility.Collapsed : Visibility.Visible;
 
         if (ActualWidth <= 0)
         {
@@ -528,6 +603,7 @@ public partial class WindowTile : UserControl
     protected override void OnMouseEnter(MouseEventArgs e)
     {
         base.OnMouseEnter(e);
+        _host.TileHover(this, true);
         BannerActions.Visibility = Banner.Visibility;
         PaintHoverButtons();
         PaintFrame();
@@ -541,6 +617,7 @@ public partial class WindowTile : UserControl
     protected override void OnMouseLeave(MouseEventArgs e)
     {
         base.OnMouseLeave(e);
+        _host.TileHover(this, false);
         BannerActions.Visibility = Visibility.Collapsed;
         PaintHoverButtons();
         _attentionTimer.Stop();

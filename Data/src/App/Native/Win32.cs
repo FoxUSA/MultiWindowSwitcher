@@ -286,6 +286,9 @@ public static class Win32
     [DllImport("kernel32.dll")]
     public static extern bool CloseHandle(IntPtr handle);
 
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GetProcessTimes(IntPtr process, out long created, out long exited, out long kernel, out long user);
+
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
     private static extern bool QueryFullProcessImageNameW(IntPtr process, int flags, StringBuilder path, ref int size);
 
@@ -396,6 +399,26 @@ public static class Win32
     /// «видимым», но программа накрывает его DWM-маской — на экране его нет.
     /// </summary>
     public static bool IsHiddenByApp(IntPtr hWnd) => !IsWindowVisible(hWnd) || IsCloakedByApp(hWnd);
+
+    /// <summary>Когда запущен процесс с этим номером; 0 — не узнать. Номера Windows выдаёт повторно, а время запуска у каждого своё.</summary>
+    public static long GetProcessStart(uint pid)
+    {
+        var handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+
+        if (handle == IntPtr.Zero)
+        {
+            return 0;
+        }
+
+        try
+        {
+            return GetProcessTimes(handle, out var created, out _, out _, out _) ? created : 0;
+        }
+        finally
+        {
+            CloseHandle(handle);
+        }
+    }
 
     public static string? GetProcessPath(uint pid)
     {

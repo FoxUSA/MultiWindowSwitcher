@@ -110,6 +110,12 @@ public sealed class TileLayoutPanel : Panel
     /// <summary>Плитка на две ячейки в ширину.</summary>
     public Func<UIElement, bool> IsWide { get; set; } = _ => false;
 
+    /// <summary>Докуда правда заняты плитки; меньше ширины панели — только в плотном ряду ленты.</summary>
+    public double UsedWidth { get; private set; }
+
+    /// <summary>Лента: сколько плитке нужно в ширину при такой высоте. Все влезают в ряд — стоят плотно слева, не растягиваясь.</summary>
+    public Func<UIElement, double, double>? StripWidth { get; set; }
+
     public UIElement? Peek
     {
         get => _peek;
@@ -262,6 +268,8 @@ public sealed class TileLayoutPanel : Panel
 
     private IEnumerable<(UIElement Child, Rect Rect)> Layout(Size size)
     {
+        UsedWidth = size.Width;
+
         if (_peek is not null && InternalChildren.Contains(_peek))
         {
             yield return (_peek, new Rect(0, 0, size.Width, size.Height));
@@ -275,6 +283,27 @@ public sealed class TileLayoutPanel : Panel
         {
             Columns = Rows = 0;
             yield break;
+        }
+
+        if (StripWidth is { } stripWidth)
+        {
+            var widths = items.Select(item => stripWidth(item, size.Height)).ToList();
+
+            if (widths.Sum() + Gap * (n - 1) <= size.Width)
+            {
+                UsedWidth = widths.Sum() + Gap * (n - 1);
+                Columns = n;
+                Rows = 1;
+                var x = 0.0;
+
+                for (var i = 0; i < n; i++)
+                {
+                    yield return (items[i], new Rect(x, 0, widths[i], size.Height));
+                    x += widths[i] + Gap;
+                }
+
+                yield break;
+            }
         }
 
         var wide = items.Select(IsWide).ToList();

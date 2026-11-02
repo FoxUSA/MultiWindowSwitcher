@@ -148,6 +148,9 @@ public sealed class AppSettings
     /// <summary>Размер крупного значка, px при 100 % масштабе.</summary>
     public double IconSize { get; set; } = 104;
 
+    /// <summary>Размер крупного значка в ленте — свой: там он стоит рядом с превью и упирается в высоту ленты.</summary>
+    public double StripIconSize { get; set; } = 104;
+
     public bool Topmost { get; set; } = true;
 
     /// <summary>Плавающая иконка у края. Выключена — открывать из трея или активным углом.</summary>
@@ -172,6 +175,21 @@ public sealed class AppSettings
     public bool Tray { get; set; } = true;
 
     public bool CornerTopLeft { get; set; } = true;
+
+    /// <summary>Лента: None — обычное окно; Top, Bottom — на всю ширину монитора, место на экране зарезервировано.</summary>
+    public string Dock { get; set; } = "None";
+
+    /// <summary>Монитор ленты (имя устройства).</summary>
+    public string DockDevice { get; set; } = string.Empty;
+
+    /// <summary>Высота ленты в единицах WPF.</summary>
+    public double DockHeight { get; set; } = 240;
+
+    /// <summary>Лента: мышь на плитке — большое превью окна рядом с лентой.</summary>
+    public bool HoverPreview { get; set; } = true;
+
+    /// <summary>Размер большого превью: процент от рабочей области монитора.</summary>
+    public double HoverPreviewSize { get; set; } = 60;
 
     /// <summary>Нажатия мыши по пустому заголовку окна или рабочему столу — показать/спрятать. null — ещё не перенесены из старых настроек.</summary>
     public List<MouseBinding>? MouseBindings { get; set; }

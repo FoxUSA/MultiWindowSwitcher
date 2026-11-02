@@ -27,6 +27,43 @@
     BorderThickness="1"
     CornerRadius="8">
     <Grid>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="Auto" />
+      <ColumnDefinition Width="*" />
+    </Grid.ColumnDefinitions>
+
+    <!--  лента: сбоку только кнопки, всегда одним столбиком: три по 28 влезают и в самую низкую ленту  -->
+    <StackPanel x:Name="DockRail" Margin="6,6,4,0" Visibility="Collapsed">
+      <ui:Button
+        x:Name="DockWindowButton"
+        Width="28"
+        Height="28"
+        Margin="0,0,0,3"
+        Padding="0"
+        Click="OnDockToWindow"
+        Icon="{ui:SymbolIcon WindowNew24}"
+        ToolTip="{core:T DockToWindowTip}" />
+      <ui:Button
+        x:Name="DockMenuButton"
+        Width="28"
+        Height="28"
+        Margin="0,0,0,3"
+        Padding="0"
+        Click="OnDockMenu"
+        Icon="{ui:SymbolIcon Navigation24}"
+        ToolTip="{core:T DockMenuTip}" />
+      <ui:Button
+        x:Name="DockViewButton"
+        Width="28"
+        Height="28"
+        Margin="0,0,0,3"
+        Padding="0"
+        Click="OnTitlesClick"
+        Icon="{ui:SymbolIcon TextFont24}"
+        ToolTip="{core:T TitlesButtonTip}" />
+    </StackPanel>
+
+    <Grid Grid.Column="1">
       <Grid.RowDefinitions>
         <RowDefinition Height="Auto" />
         <RowDefinition Height="Auto" />
@@ -86,6 +123,7 @@
             </ui:ToggleSwitch>
             <!--  крестик прячет в трей, «свернуть» — на панель задач, выход — здесь  -->
             <Button
+              x:Name="ExitButton"
               Margin="14,0,0,0"
               Click="OnExitClick"
               Style="{StaticResource ExitButton}"
@@ -129,6 +167,7 @@
           TextChanged="OnSearchChanged" />
 
         <Border
+          x:Name="FilterBox"
           Grid.Column="1"
           Height="34"
           Margin="0,0,8,0"
@@ -245,6 +284,7 @@
           </StackPanel>
         </ui:Button>
         <ui:Button
+          x:Name="RefreshButton"
           Grid.Column="8"
           Width="34"
           Height="34"
@@ -265,7 +305,7 @@
       </Grid>
 
       <!--  сетка окон  -->
-      <Grid Grid.Row="2" Margin="12,0,12,0">
+      <Grid x:Name="TilesHost" Grid.Row="2" Margin="12,0,12,0">
         <controls:TileLayoutPanel x:Name="Tiles" />
         <TextBlock
           x:Name="EmptyText"
@@ -279,6 +319,7 @@
 
       <!--  строка состояния: сколько окон, сетка, последнее действие, подсказки для мыши  -->
       <Border
+        x:Name="StatusBar"
         Grid.Row="3"
         Height="30"
         Margin="0,10,0,0"
@@ -329,6 +370,81 @@
             Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
         </Grid>
       </Border>
+
+      <!--  меню ленты: привычные заголовок и панель окна, сюда они переезжают на время ленты  -->
+      <Popup
+        x:Name="DockMenu"
+        AllowsTransparency="True"
+        Placement="Right"
+        PlacementTarget="{Binding ElementName=DockRail}"
+        PopupAnimation="Fade"
+        StaysOpen="True">
+        <Border
+          x:Name="DockMenuFrame"
+          Width="1180"
+          Margin="6,0,0,0"
+          Background="{StaticResource AppBackgroundBrush}"
+          BorderBrush="{StaticResource PopupStrokeBrush}"
+          BorderThickness="1"
+          CornerRadius="8">
+          <StackPanel x:Name="DockMenuHost">
+            <Grid Height="44" Margin="12,0,8,0">
+              <StackPanel Orientation="Horizontal">
+                <ContentControl VerticalAlignment="Center" Content="{core:AppIcon}" />
+                <TextBlock
+                  x:Name="DockMenuTitle"
+                  Margin="10,0,0,0"
+                  VerticalAlignment="Center"
+                  FontSize="12" />
+              </StackPanel>
+              <StackPanel
+                x:Name="DockMenuBar"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Center"
+                Orientation="Horizontal">
+                <ui:Button
+                  x:Name="RailMonitorButton"
+                  Width="34"
+                  Height="30"
+                  Margin="6,0,0,0"
+                  Padding="0"
+                  Click="OnRailMonitor"
+                  ToolTip="{core:T RailMonitorTip}">
+                  <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="15" Text="&#xE7F4;" />
+                </ui:Button>
+                <ui:Button
+                  x:Name="RailHideButton"
+                  Width="34"
+                  Height="30"
+                  Margin="6,0,0,0"
+                  Padding="0"
+                  Click="OnRailHide"
+                  Icon="{ui:SymbolIcon Dismiss24}"
+                  ToolTip="{core:T RailHideTip}" />
+              </StackPanel>
+            </Grid>
+          </StackPanel>
+        </Border>
+      </Popup>
+
+      <!--  в ленте нет строки состояния: сообщения всплывают рядом с кнопками  -->
+      <Popup
+        x:Name="DockToast"
+        AllowsTransparency="True"
+        IsHitTestVisible="False"
+        Placement="Right"
+        PlacementTarget="{Binding ElementName=DockRail}"
+        StaysOpen="True">
+        <Border
+          Margin="8,6,0,0"
+          Padding="12,6"
+          Background="{StaticResource PopupBrush}"
+          BorderBrush="{StaticResource PopupStrokeBrush}"
+          BorderThickness="1"
+          CornerRadius="8">
+          <TextBlock x:Name="DockToastText" FontSize="12" />
+        </Border>
+      </Popup>
 
       <!--  настройки: всплывают поверх превью (отдельное окно Popup — превью DWM его не перекрывает)  -->
       <Popup
@@ -409,6 +525,61 @@
                 <Setter Property="BorderThickness" Value="0,1,0,0" />
               </Style>
             </StackPanel.Resources>
+
+            <!--  где стоит окно: обычное или лента у края монитора  -->
+            <TextBlock Style="{StaticResource ViewSection}" Text="{core:T ViewSecDock}" />
+            <Border
+              Height="32"
+              Padding="2"
+              HorizontalAlignment="Left"
+              Background="{DynamicResource ControlFillColorDefaultBrush}"
+              BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+              BorderThickness="1"
+              CornerRadius="5">
+              <StackPanel Orientation="Horizontal">
+                <RadioButton
+                  x:Name="DockWindow"
+                  Checked="OnDockChanged"
+                  Content="{core:T DockWindow}"
+                  GroupName="Dock"
+                  Style="{StaticResource SegmentButton}" />
+                <RadioButton
+                  x:Name="DockTop"
+                  Checked="OnDockChanged"
+                  Content="{core:T DockTop}"
+                  GroupName="Dock"
+                  Style="{StaticResource SegmentButton}" />
+                <RadioButton
+                  x:Name="DockBottom"
+                  Checked="OnDockChanged"
+                  Content="{core:T DockBottom}"
+                  GroupName="Dock"
+                  Style="{StaticResource SegmentButton}" />
+              </StackPanel>
+            </Border>
+            <TextBlock Style="{StaticResource ViewTip}" Text="{core:T DockTip}" />
+            <ui:ToggleSwitch
+              x:Name="HoverPreviewSwitch"
+              Click="OnHoverPreviewSwitch"
+              Content="{core:T HoverPreview}" />
+            <TextBlock Style="{StaticResource ViewTip}" Text="{core:T HoverPreviewTip}" />
+            <Grid Margin="0,0,0,2">
+              <TextBlock FontSize="12" Text="{core:T HoverPreviewSize}" />
+              <TextBlock
+                x:Name="HoverPreviewSizeText"
+                HorizontalAlignment="Right"
+                FontSize="12"
+                Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+            </Grid>
+            <Slider
+              x:Name="HoverPreviewSizeSlider"
+              Margin="0,0,0,10"
+              IsSnapToTickEnabled="True"
+              Maximum="90"
+              Minimum="30"
+              TickFrequency="5"
+              ValueChanged="OnHoverPreviewSizeChanged" />
+            <Border Style="{StaticResource ViewDivider}" />
 
             <!--  1. что показывать в названии  -->
             <TextBlock Style="{StaticResource ViewSection}" Text="{core:T ViewSecText}" />
@@ -568,6 +739,7 @@
           </StackPanel>
         </Border>
       </Popup>
+    </Grid>
     </Grid>
   </Border>
 </ui:FluentWindow>

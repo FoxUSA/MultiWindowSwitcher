@@ -128,7 +128,7 @@ public partial class App : Application
         Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(ExplorerDuplicates.CloseAll));
 
         // при автозапуске — тихо, только иконка у края; иначе сразу показываем, что умеем
-        if (!e.Args.Contains(Autostart.Flag, StringComparer.OrdinalIgnoreCase))
+        if (!e.Args.Contains(Autostart.Flag, StringComparer.OrdinalIgnoreCase) || Settings.Current.Dock is "Top" or "Bottom")
         {
             Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() =>
                 Switcher.ShowSwitcher(Fab.Side, ShowReason.Startup)));
@@ -205,6 +205,7 @@ public partial class App : Application
         {
             Corners.Stop();
             Gestures.Stop();
+            Switcher.ReleaseDock();
             Tracker.Stop(Switcher);
             Parking.UnparkAll();
             Switcher.SavePlacement();

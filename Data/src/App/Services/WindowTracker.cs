@@ -28,7 +28,7 @@ public sealed class WindowTracker
     };
 
     private readonly Dictionary<IntPtr, WindowItem> _map = new();
-    private readonly Dictionary<uint, (string App, string Title, string Path)> _apps = new();
+    private readonly Dictionary<uint, (long Started, string App, string Title, string Path)> _apps = new();
     private readonly Dictionary<string, ImageSource?> _exeIcons = new(StringComparer.OrdinalIgnoreCase);
     private readonly DispatcherTimer _timer;
     private readonly DispatcherTimer _soon;
@@ -520,9 +520,12 @@ public sealed class WindowTracker
     /// </summary>
     private (string App, string Title, string Path) AppOf(IntPtr hwnd, uint pid)
     {
-        if (_apps.TryGetValue(pid, out var known) && known.App != "applicationframehost.exe")
+        // номер закрывшегося процесса Windows выдаёт новому: запись верна, только пока это тот же запуск
+        var started = GetProcessStart(pid);
+
+        if (_apps.TryGetValue(pid, out var known) && known.Started == started && known.App != "applicationframehost.exe")
         {
-            return known;
+            return (known.App, known.Title, known.Path);
         }
 
         var path = GetProcessPath(pid) ?? string.Empty;
@@ -559,7 +562,7 @@ public sealed class WindowTracker
         }
 
         var result = (exe.Length > 0 ? exe : "unknown", Describe(path), path);
-        _apps[pid] = result;
+        _apps[pid] = (started, result.Item1, result.Item2, result.Item3);
         return result;
     }
 
