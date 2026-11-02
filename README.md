@@ -22,14 +22,6 @@ Hover the edge icon — see it, click — switch.
 
 </div>
 
-<p align="center">
-<a href="images/en-grid.png"><img src="images/en-grid.png" height="140" alt="Every window as a live preview"></a>
-<a href="images/en-menu.png"><img src="images/en-menu.png" height="140" alt="Window menu"></a>
-<a href="images/en-peek.png"><img src="images/en-peek.png" height="140" alt="Enlarged window"></a>
-<a href="images/en-settings.png"><img src="images/en-settings.png" height="140" alt="Settings"></a>
-<a href="images/en-update.png"><img src="images/en-update.png" height="140" alt="Update"></a>
-</p>
-
 See what's going on in every window at once — minimized ones too. Pick one to switch, or just look and move the mouse away — it all slides off.
 
 - **Live previews** — every window in an even grid, previews update live. Minimized ones too: the window quietly keeps rendering.
@@ -37,7 +29,8 @@ See what's going on in every window at once — minimized ones too. Pick one to 
 - **Your own names** — double-click to give a window a big name: “Server”, “Work”. It's recognized again after a restart.
 - **Order** — the grid fits any size. **Group** puts windows of the same app together, pinned ones first.
 - **Events** — a window flashes on the taskbar, its tile and the edge icon light up.
-- **All by mouse** — click to switch, wheel to enlarge, middle button to close, right button for the menu.
+- **All by mouse** — click to switch, middle button to close, right button for the menu. Show the windows with any mouse click you record — on an empty title bar or the desktop.
+- **Close duplicate folders** — one folder, one File Explorer window: duplicates close at startup and whenever a folder is opened again.
 
 ## Get started
 
