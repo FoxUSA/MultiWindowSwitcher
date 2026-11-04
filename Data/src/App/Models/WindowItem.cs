@@ -14,6 +14,7 @@ public sealed class WindowItem : ObservableObject
     private bool _isWide;
     private bool _attention;
     private bool _isActive;
+    private bool _busy;
     private int _monitor = 1;
     private ImageSource? _icon;
 
@@ -119,6 +120,13 @@ public sealed class WindowItem : ObservableObject
     {
         get => _isActive;
         set => Set(ref _isActive, value);
+    }
+
+    /// <summary>В окне не на переднем плане сейчас что-то происходит: набирается текст, бегут строки. Затихло — сброшено.</summary>
+    public bool Busy
+    {
+        get => _busy;
+        set => Set(ref _busy, value);
     }
 
     public int Monitor

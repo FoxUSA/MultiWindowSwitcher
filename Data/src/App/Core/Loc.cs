@@ -68,6 +68,7 @@ public sealed class Loc : INotifyPropertyChanged
         ["HoverPreviewTip"] = ("Только в ленте: мышь на плитке — окно крупно рядом с лентой, убрали — исчезло", "Strip only: hover a tile to see the window big next to the strip; move away and it’s gone"),
         ["HoverPreviewSize"] = ("Размер, от рабочей области монитора", "Size, share of the monitor’s work area"),
         ["ActiveDotTip"] = ("Окно на переднем плане", "Window in front"),
+        ["BusyDotTip"] = ("В окне сейчас что-то происходит", "Something is happening in this window"),
         ["DockToWindowTip"] = ("Вернуть в режим окна", "Back to window mode"),
         ["DockMenuTip"] = ("Меню", "Menu"),
         ["RailHideTip"] = ("Спрятать ленту и освободить место", "Hide the strip and free the space"),

@@ -599,6 +599,21 @@ public partial class WindowTile : UserControl
         MonitorBadge.Visibility = ShowMonitor && !Compact ? Visibility.Visible : Visibility.Collapsed;
         StateChip.Visibility = Compact ? Visibility.Collapsed : Visibility.Visible;
         ActiveDot.Visibility = Compact && Item.IsActive && !Item.IsMinimized ? Visibility.Visible : Visibility.Collapsed;
+        var busy = Compact && Item.Busy && !Item.IsActive;
+
+        if (busy != (BusyDot.Visibility == Visibility.Visible))
+        {
+            BusyDot.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
+
+            // тусклое мигание, пока в окне движение
+            BusyDot.BeginAnimation(OpacityProperty, busy
+                ? new System.Windows.Media.Animation.DoubleAnimation(0.45, 1.0, TimeSpan.FromMilliseconds(600))
+                {
+                    AutoReverse = true,
+                    RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever,
+                }
+                : null);
+        }
 
         if (ActualWidth <= 0)
         {

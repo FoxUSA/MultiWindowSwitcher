@@ -237,6 +237,11 @@ public sealed class WindowTracker
         foreach (var w in Windows)
         {
             w.IsActive = w.Hwnd == hwnd;
+
+            if (w.IsActive)
+            {
+                w.Busy = false;
+            }
         }
     }
 
@@ -929,10 +934,18 @@ public sealed class WindowTracker
         return IsIconic(item.Hwnd);
     }
 
-    /// <summary>Выше в стопке есть чужое окно, которое заходит на это. Панель задач, свои и припаркованные окна не в счёт.</summary>
-    public static bool HasWindowAbove(IntPtr hwnd)
+    /// <summary>
+    /// Выше в стопке есть чужое окно, которое заходит на это. Панель задач, свои и припаркованные окна не в счёт.
+    /// width — у окна видна только эта часть слева (лента обрезана по последней плитке); 0 — всё окно.
+    /// </summary>
+    public static bool HasWindowAbove(IntPtr hwnd, int width = 0)
     {
         GetWindowRect(hwnd, out var me);
+
+        if (width > 0)
+        {
+            me.Right = Math.Min(me.Right, me.Left + width);
+        }
         var ownPid = (uint)Environment.ProcessId;
 
         for (var h = GetWindow(hwnd, GW_HWNDPREV); h != IntPtr.Zero; h = GetWindow(h, GW_HWNDPREV))

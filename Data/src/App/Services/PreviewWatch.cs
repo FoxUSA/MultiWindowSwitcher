@@ -10,6 +10,7 @@ namespace MultiWindowSwitcher.Services;
 /// смотрим на экран: правая половина превью (слева внизу крупный значок) ровно цвета подложки — картинки нет.
 /// Сначала заново подключаем превью, не помогло — просим окно перерисоваться.
 /// Причину воспроизвести не удалось, поэтому в лог идёт состояние окна и что сработало.
+/// Тот же снимок показывает и движение: картинка окна не на виду меняется — на плитке мигает точка, затихло — гаснет.
 /// </summary>
 public sealed class PreviewWatch
 {
@@ -19,11 +20,26 @@ public sealed class PreviewWatch
 
     private const uint RDW_INVALIDATE = 0x0001, RDW_ERASE = 0x0004, RDW_ALLCHILDREN = 0x0080, RDW_FRAME = 0x0400;
 
+    /// <summary>Клетка, по которой сравниваем картинку, пиксели экрана. Мелкая: одна набранная буква тоже движение.</summary>
+    private const int Cell = 6;
+
+    /// <summary>Сколько последних картинок помним: мигающий курсор возвращает уже виденную, это не движение.</summary>
+    private const int Remembered = 6;
+
+    /// <summary>Столько без изменений — движение кончилось.</summary>
+    private static readonly TimeSpan Quiet = TimeSpan.FromSeconds(4);
+
+    /// <summary>Столько после начала слежения изменения не в счёт: превью только что подключили или окно ушло назад, оно дорисовывается.</summary>
+    private static readonly TimeSpan Settle = TimeSpan.FromSeconds(3);
+
     private readonly Dictionary<WindowTile, Trouble> _troubles = new();
+    private readonly Dictionary<WindowTile, Motion> _motions = new();
 
     /// <param name="originX">Левый верхний угол содержимого переключателя, пиксели экрана.</param>
     /// <param name="originY">То же по вертикали.</param>
-    public void Check(IReadOnlyCollection<WindowTile> tiles, int originX, int originY)
+    /// <param name="blank">Проверить, не опустели ли превью.</param>
+    /// <param name="motion">Проверить, не поменялось ли что-то в окнах не на виду.</param>
+    public void Check(IReadOnlyCollection<WindowTile> tiles, int originX, int originY, bool blank, bool motion)
     {
         var shown = new List<(WindowTile Tile, Rectangle Rect)>();
 
@@ -38,6 +54,12 @@ public sealed class PreviewWatch
         foreach (var gone in _troubles.Keys.Where(t => shown.All(s => s.Tile != t)).ToList())
         {
             _troubles.Remove(gone);
+        }
+
+        foreach (var gone in _motions.Keys.Where(t => shown.All(s => s.Tile != t)).ToList())
+        {
+            gone.Item.Busy = false;
+            _motions.Remove(gone);
         }
 
         if (shown.Count == 0)
@@ -56,10 +78,29 @@ public sealed class PreviewWatch
                 graphics.CopyFromScreen(area.Left, area.Top, 0, 0, area.Size);
             }
 
+            int[]? pixels = null;
+
+            if (motion)
+            {
+                var data = screen.LockBits(new Rectangle(0, 0, area.Width, area.Height), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+                pixels = new int[area.Width * area.Height];
+                System.Runtime.InteropServices.Marshal.Copy(data.Scan0, pixels, 0, pixels.Length);
+                screen.UnlockBits(data);
+            }
+
             foreach (var (tile, rect) in shown)
             {
                 rect.Offset(-area.Left, -area.Top);
-                Judge(tile, IsBlank(screen, rect));
+
+                if (blank)
+                {
+                    Judge(tile, IsBlank(screen, rect));
+                }
+
+                if (pixels is not null)
+                {
+                    Watch(tile, Signature(pixels, area.Width, rect));
+                }
             }
         }
         catch (Exception ex)
@@ -140,6 +181,76 @@ public sealed class PreviewWatch
         }
     }
 
+    /// <summary>Сумма цветов по клеткам; края не берём — по ним проходит рамка плитки.</summary>
+    private static int[] Signature(int[] pixels, int stride, Rectangle rect)
+    {
+        var inner = Rectangle.Inflate(rect, -4, -4);
+        var cols = Math.Max(1, inner.Width / Cell);
+        var rows = Math.Max(1, inner.Height / Cell);
+        var sums = new int[cols * rows];
+
+        for (var y = 0; y < Math.Min(rows * Cell, inner.Height); y++)
+        {
+            var line = (inner.Top + y) * stride + inner.Left;
+            var cell = y / Cell * cols;
+
+            for (var x = 0; x < Math.Min(cols * Cell, inner.Width); x++)
+            {
+                var p = pixels[line + x];
+                sums[cell + x / Cell] += (p & 0xFF) + (p >> 8 & 0xFF) + (p >> 16 & 0xFF);
+            }
+        }
+
+        return sums;
+    }
+
+    /// <summary>
+    /// Картинка, какой у окна не было ни разу из последних, — движение. Окно вышло вперёд или ушло назад, свернулось,
+    /// плитка сдвинулась — картинка меняется сама по себе: начинаем смотреть заново.
+    /// </summary>
+    private void Watch(WindowTile tile, int[] signature)
+    {
+        var item = tile.Item;
+        var key = $"{tile.ThumbnailRect?.Left},{tile.ThumbnailRect?.Top},{tile.ThumbnailRect?.Width},{tile.ThumbnailRect?.Height},{item.IsActive},{item.IsMinimized},{item.InTray}";
+
+        if (!_motions.TryGetValue(tile, out var motion) || motion.Key != key)
+        {
+            item.Busy = false;
+            _motions[tile] = new Motion(key, signature);
+            return;
+        }
+
+        if (motion.Seen.Any(seen => seen.AsSpan().SequenceEqual(signature)))
+        {
+            return;
+        }
+
+        motion.Seen.Add(signature);
+
+        if (motion.Seen.Count > Remembered)
+        {
+            motion.Seen.RemoveAt(0);
+        }
+
+        if (!item.IsActive && DateTime.UtcNow - motion.Since > Settle)
+        {
+            motion.Moved = DateTime.UtcNow;
+            item.Busy = true;
+        }
+    }
+
+    /// <summary>Гасит точку у окон, где давно ничего не менялось. Каждый такт, даже когда на экран не смотрим.</summary>
+    public void Calm()
+    {
+        foreach (var (tile, motion) in _motions)
+        {
+            if (tile.Item.Busy && DateTime.UtcNow - motion.Moved > Quiet)
+            {
+                tile.Item.Busy = false;
+            }
+        }
+    }
+
     private static void Reconnect(WindowTile tile, Trouble trouble)
     {
         tile.ReconnectThumbnail();
@@ -158,6 +269,18 @@ public sealed class PreviewWatch
         var size = tile.SourceSize;
         return $"«{tile.Item.Title}» ({tile.Item.App}), видимо {IsWindowVisible(hwnd)}, спрятано DWM {IsCloaked(hwnd)}, свёрнуто {IsIconic(hwnd)}, "
             + $"припарковано {Parking.IsParked(hwnd)}, размер у DWM {size.cx}×{size.cy}, стиль {GetExStyle(hwnd):X}";
+    }
+
+    private sealed class Motion(string key, int[] first)
+    {
+        public string Key { get; } = key;
+
+        public List<int[]> Seen { get; } = new() { first };
+
+        public DateTime Since { get; } = DateTime.UtcNow;
+
+        /// <summary>Когда картинка в последний раз стала новой.</summary>
+        public DateTime Moved { get; set; }
     }
 
     private sealed class Trouble

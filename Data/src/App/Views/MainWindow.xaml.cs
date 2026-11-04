@@ -338,7 +338,8 @@ public partial class MainWindow : FluentWindow, ITileHost
     }
 
     /// <summary>Над окном переключателя есть чужое видимое окно, которое его перекрывает.</summary>
-    public bool IsCovered() => WindowTracker.HasWindowAbove(_hwnd);
+    /// <summary>В ленте — только по плиткам: чужое окно над пустой частью полосы ничего не закрывает.</summary>
+    public bool IsCovered() => WindowTracker.HasWindowAbove(_hwnd, _railOn ? _stripRegion : 0);
 
     /// <summary>
     /// Вызвали явно (трей) — окно поверх всех и активное. Короткий «поверх всех» поднимает его над
@@ -545,11 +546,20 @@ public partial class MainWindow : FluentWindow, ITileHost
         // окно развернули кнопкой или программа сама сдвинула его: об этом Windows отдельно не сообщает
         FitWindowsToStrip();
 
-        // раз в ~3 с: не опустело ли какое-нибудь превью. Смотрим на экран — только когда нас ничего не закрывает
-        if (++_slowTicks % 4 == 0 && IsShown && IsVisible && !IsBusy && _dragOrder.Count == 0 && !Tiles.IsMoving && !IsCovered())
+        _previewWatch.Calm();
+
+        // раз в ~1,4 с: что происходит в окнах не на виду (только в ленте — она всегда на экране); раз в ~3 с — не опустело ли
+        // какое-нибудь превью. Смотрим на экран — только когда нас ничего не закрывает и мышь не над лентой (там всплывает лишнее)
+        if (++_slowTicks % 2 == 0 && IsShown && IsVisible && !IsBusy && _dragOrder.Count == 0 && !Tiles.IsMoving && !IsCovered())
         {
-            var origin = PointToScreen(new Point(0, 0));
-            _previewWatch.Check(_tiles.Values.ToList(), (int)origin.X, (int)origin.Y);
+            var blank = _slowTicks % 4 == 0;
+            var motion = _railOn && !DockMenu.IsOpen && !IsMouseOver;
+
+            if (blank || motion)
+            {
+                var origin = PointToScreen(new Point(0, 0));
+                _previewWatch.Check(_tiles.Values.ToList(), (int)origin.X, (int)origin.Y, blank, motion);
+            }
         }
     }
 
